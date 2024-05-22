@@ -23,6 +23,14 @@ See the Mulan PSL v2 for more details. */
 #include "common/config.h"
 #include "errors.h"  
 
+/*
+磁盘管理器
+
+在本任务中，参赛队伍需要实现磁盘管理器DiskManager的相关接口，磁盘管理器负责文件操作、读写页面等。
+在完成本任务之前，参赛队伍需要阅读项目结构文档中磁盘管理器的相关说明，以及代码框架中src/errors.h、
+src/storage/disk_manager.h、src/storage/disk_manager.cpp、src/common/config.h文件。
+*/
+
 /**
  * @description: DiskManager的作用主要是根据上层的需要对磁盘文件进行操作
  */

@@ -13,32 +13,33 @@ See the Mulan PSL v2 for more details. */
 #include "common/config.h"
 
 /**
- * Replacer is an abstract class that tracks page usage.
+ * Replacer 是一个抽象类，用于跟踪页面使用情况。
  */
-class Replacer {
-   public:
-    Replacer() = default;
-    virtual ~Replacer() = default;
+class Replacer
+{
+public:
+        Replacer() = default;
+        virtual ~Replacer() = default;
 
-    /**
-     * Remove the victim frame as defined by the replacement policy.
-     * @param[out] frame_id id of frame that was removed, nullptr if no victim was found
-     * @return true if a victim frame was found, false otherwise
-     */
-    virtual bool victim(frame_id_t *frame_id) = 0;
+        /**
+         * 根据替换策略移除 victim 帧。
+         * @param[out] frame_id 被移除的帧的 ID，如果没有找到 victim 则为 nullptr
+         * @return 如果找到 victim 帧返回 true，否则返回 false
+         */
+        virtual bool victim(frame_id_t *frame_id) = 0;
 
-    /**
-     * Pins a frame, indicating that it should not be victimized until it is unpinned.
-     * @param frame_id the id of the frame to pin
-     */
-    virtual void pin(frame_id_t frame_id) = 0;
+        /**
+         * 固定一个帧，表示在其被取消固定之前不应该被选为 victim
+         * @param frame_id 要固定的帧的 ID
+         */
+        virtual void pin(frame_id_t frame_id) = 0;
 
-    /**
-     * Unpins a frame, indicating that it can now be victimized.
-     * @param frame_id the id of the frame to unpin
-     */
-    virtual void unpin(frame_id_t frame_id) = 0;
+        /**
+         * 取消固定一个帧，表示它现在可以被选为 victim
+         * @param frame_id 要取消固定的帧的 ID
+         */
+        virtual void unpin(frame_id_t frame_id) = 0;
 
-    /** @return the number of elements in the replacer that can be victimized */
-    virtual size_t Size() = 0;
+        /** @return 返回 replacer 中可以被选为 victim 的元素数量 */
+        virtual size_t Size() = 0;
 };
