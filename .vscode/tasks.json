@@ -1,0 +1,55 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+              "type": "shell",
+              "label": "build unit_test",
+                /*修改*/
+              "command": "make",
+              "args": [
+                    "unit_test",
+                    "-j4"
+              ],// 编译命令参数
+              "options": {
+                   /*修改*/
+                  "cwd": "${workspaceFolder}/rmdb/build"
+              },
+              "problemMatcher": [
+                  "$gcc"
+              ],
+              "group": {
+                  "kind": "build",
+                  "isDefault": false
+              },
+              "presentation": {
+                  "panel": "new", //这里shared表示共享，改成new之后每个进程创建新的端口
+              }
+        },
+        {
+            "type": "shell",
+            "label": "build rmdb",
+                /*修改*/
+            "command": "make",
+            "args": [
+                    "rmdb",
+                    "-j16"
+            ],// 编译命令参数
+            "options": {
+                    /*修改*/
+                "cwd": "${workspaceFolder}/rmdb/build"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "panel": "new", //这里shared表示共享，改成new之后每个进程创建新的端口
+            }
+      },
+    ]
+}
