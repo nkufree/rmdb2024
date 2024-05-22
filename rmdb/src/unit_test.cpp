@@ -289,7 +289,6 @@ TEST_F(BufferPoolManagerTest, SampleTest) {
     int fd = BufferPoolManagerTest::fd_;
     PageId page_id_temp = {.fd = fd, .page_no = INVALID_PAGE_ID};
     auto *page0 = bpm->new_page(&page_id_temp);
-
     // Scenario: The buffer pool is empty. We should be able to create a new page.
     ASSERT_NE(nullptr, page0);
     EXPECT_EQ(0, page_id_temp.page_no);

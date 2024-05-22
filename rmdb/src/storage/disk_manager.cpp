@@ -35,9 +35,10 @@ void DiskManager::write_page(int fd, page_id_t page_no, const char *offset, int 
     off_t offset_tmp = page_no * PAGE_SIZE;
     if (lseek(fd, offset_tmp, SEEK_SET) == -1)
     {
-        throw std::runtime_error("Failed to seek to page location");
+        throw InternalError("Failed to seek to page location");
     }
     ssize_t bytes_written = write(fd, offset, num_bytes);
+    
     if (bytes_written != num_bytes)
     {
         throw InternalError("DiskManager::write_page Error");
@@ -60,7 +61,7 @@ void DiskManager::read_page(int fd, page_id_t page_no, char *offset, int num_byt
     off_t offset_tmp = page_no * PAGE_SIZE;
     if (lseek(fd, offset_tmp, SEEK_SET) == -1)
     {
-        throw std::runtime_error("Failed to seek to page location");
+        throw InternalError("Failed to seek to page location");
     }
     ssize_t bytes_read = read(fd, offset, num_bytes);
     if (bytes_read != num_bytes)
@@ -130,16 +131,20 @@ void DiskManager::create_file(const std::string &path)
     // Todo:
     // 调用open()函数，使用O_CREAT模式
     // 注意不能重复创建相同文件
+    if(is_file(path))
+    {
+        throw FileExistsError("File already exists: " + path);
+    }
     int fd = open(path.c_str(), O_CREAT, 0666);
     if (fd == -1)
     {
         if (errno == EEXIST)
         {
-            throw std::runtime_error("File already exists: " + path);
+            throw FileExistsError("File already exists: " + path);
         }
         else
         {
-            throw std::runtime_error("Failed to create file: " + path);
+            throw FileNotOpenError(fd);
         }
     }
     close(fd);
@@ -156,7 +161,7 @@ void DiskManager::destroy_file(const std::string &path)
     // 注意不能删除未关闭的文件
     if (unlink(path.c_str()) == -1)
     {
-        throw std::runtime_error("Failed to delete file: " + path);
+        throw FileNotFoundError("Failed to delete file: " + path);
     }
 }
 
@@ -172,12 +177,12 @@ int DiskManager::open_file(const std::string &path)
     // 注意不能重复打开相同文件，并且需要更新文件打开列表
     if (path2fd_.find(path) != path2fd_.end())
     {
-        throw std::runtime_error("File already open: " + path);
+        throw FileExistsError("File already open: " + path);
     }
     int fd = open(path.c_str(), O_RDWR);
     if (fd == -1)
     {
-        throw std::runtime_error("Failed to open file: " + path);
+        throw FileNotFoundError("Failed to open file: " + path);
     }
     path2fd_[path] = fd;
     fd2path_[fd] = path;
@@ -196,11 +201,11 @@ void DiskManager::close_file(int fd)
     auto it = fd2path_.find(fd);
     if (it == fd2path_.end())
     {
-        throw std::runtime_error("Attempted to close an unopened file descriptor");
+        throw FileNotOpenError(fd);
     }
     if (close(fd) == -1)
     {
-        throw std::runtime_error("Failed to close file");
+        throw InternalError("Failed to close file");
     }
     path2fd_.erase(it->second);
     fd2path_.erase(it);
