@@ -1,0 +1,54 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "rmdb debug", // 配置名称，将会在启动配置的下拉菜单中显示
+            "type": "cppdbg", // 配置类型，这里只能为cppdbg
+            "request": "launch", // 请求配置类型，可以为launch（启动）或attach（附加）
+            "program": "${workspaceFolder}/build/bin/rmdb", // 将要进行调试的程序的路径
+            "args": [
+                "test"
+            ], // 程序调试时传递给程序的命令行参数，一般设为空即可
+            "stopAtEntry": false, // 设为true时程序将暂停在程序入口处，一般设置为false
+            "cwd": "${workspaceFolder}/build", // 调试程序时的工作目录，一般为${workspaceRoot}即代码所在目录，根据自身情况设定为${fileDirname}
+            "environment": [],
+            "externalConsole": false, // 调试时是否显示控制台窗口，设置为true时会弹出控制台出来，这个随意
+            "MIMode": "gdb",
+            /*此处修改*/
+            "miDebuggerPath": "gdb", // miDebugger的路径，注意这里要与MinGw的路径对应
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": false
+                }
+            ],
+            "preLaunchTask": "build rmdb"
+        },
+        {
+            "name": "unit test debug", // 配置名称，将会在启动配置的下拉菜单中显示
+            "type": "cppdbg", // 配置类型，这里只能为cppdbg
+            "request": "launch", // 请求配置类型，可以为launch（启动）或attach（附加）
+            "program": "${workspaceFolder}/build/bin/unit_test", // 将要进行调试的程序的路径
+            "args": [], // 程序调试时传递给程序的命令行参数，一般设为空即可
+            "stopAtEntry": false, // 设为true时程序将暂停在程序入口处，一般设置为false
+            "cwd": "${workspaceFolder}/build", // 调试程序时的工作目录，一般为${workspaceRoot}即代码所在目录，根据自身情况设定为${fileDirname}
+            "environment": [],
+            "externalConsole": false, // 调试时是否显示控制台窗口，设置为true时会弹出控制台出来，这个随意
+            "MIMode": "gdb",
+            /*此处修改*/
+            "miDebuggerPath": "gdb", // miDebugger的路径，注意这里要与MinGw的路径对应
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": false
+                }
+            ],
+            "preLaunchTask": "build unit_test"
+        },
+    ]
+}
