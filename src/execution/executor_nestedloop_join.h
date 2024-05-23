@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
+#include "condition_check.h"
 
 class NestedLoopJoinExecutor : public AbstractExecutor {
    private:
@@ -44,16 +45,60 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-
+        isend = false;
+        left_->beginTuple();
+        while(!(left_->is_end())) {
+            right_->beginTuple();
+            while(!(right_->is_end())) {
+                auto rec_left = left_->Next();
+                auto rec_right = right_->Next();
+                std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
+                memcpy(new_rec->data, rec_left->data, left_->tupleLen());
+                memcpy(new_rec->data + left_->tupleLen(), rec_right->data, right_->tupleLen());
+                if(ConditionCheck::check_conditions(fed_conds_, cols_, new_rec)) {
+                    return;
+                }
+                right_->nextTuple();
+            }
+            left_->nextTuple();
+        }
+        isend = true;
     }
 
     void nextTuple() override {
-        
+        right_->nextTuple();
+        while(!(left_->is_end())) {
+            while(!(right_->is_end())) {
+                auto rec_left = left_->Next();
+                auto rec_right = right_->Next();
+                std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
+                memcpy(new_rec->data, rec_left->data, left_->tupleLen());
+                memcpy(new_rec->data + left_->tupleLen(), rec_right->data, right_->tupleLen());
+                if(ConditionCheck::check_conditions(fed_conds_, cols_, new_rec)) {
+                    return;
+                }
+                right_->nextTuple();
+            }
+            left_->nextTuple();
+            right_->beginTuple();
+        }
+        isend = true;
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        auto rec_left = left_->Next();
+        auto rec_right = right_->Next();
+        std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
+        memcpy(new_rec->data, rec_left->data, left_->tupleLen());
+        memcpy(new_rec->data + left_->tupleLen(), rec_right->data, right_->tupleLen());
+        return new_rec;
     }
+
+    bool is_end() const override { return isend; }
+
+    const std::vector<ColMeta> &cols() const override { return cols_; }
+
+    size_t tupleLen() const override { return len_; }
 
     Rid &rid() override { return _abstract_rid; }
 };

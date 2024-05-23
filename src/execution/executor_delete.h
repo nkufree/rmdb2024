@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
+#include "condition_check.h"
 
 class DeleteExecutor : public AbstractExecutor {
    private:
@@ -37,6 +38,15 @@ class DeleteExecutor : public AbstractExecutor {
     }
 
     std::unique_ptr<RmRecord> Next() override {
+        for(auto &rid : rids_) {
+            auto rec = fh_->get_record(rid, context_);
+            if (rec == nullptr) {
+                throw RecordNotFoundError(rid.page_no, rid.slot_no);
+            }
+            if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
+                continue;
+            fh_->delete_record(rid, context_);
+        }
         return nullptr;
     }
 

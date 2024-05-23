@@ -17,36 +17,36 @@ public:
     static bool check_single_condition(const Condition& cond, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
     {
         // 1. 构建两个比较的value
-        const std::string& lhs_col_name = cond.lhs_col.col_name;
-        ColType lhs_type;
-        int lhs_offset;
-        for(auto& col : cols)
-        {
-            if(strcmp(col.name.c_str(), lhs_col_name.c_str()) == 0)
-            {
-                lhs_type = col.type;
-                lhs_offset = col.offset;
-                break;
-            }
-        }
-        
-        Value lhs_val = build_value(lhs_type, lhs_offset, rec);
+        // const std::string& lhs_col_name = cond.lhs_col.col_name;
+        // ColType lhs_type;
+        // int lhs_offset;
+        // for(auto& col : cols)
+        // {
+        //     if(strcmp(col.name.c_str(), lhs_col_name.c_str()) == 0)
+        //     {
+        //         lhs_type = col.type;
+        //         lhs_offset = col.offset;
+        //         break;
+        //     }
+        // }
+        auto lhs_match_col = AbstractExecutor::get_col(cols, cond.lhs_col);
+        Value lhs_val = build_value(lhs_match_col->type, lhs_match_col->offset, rec);
         Value rhs_val = cond.rhs_val;
         if(!cond.is_rhs_val)
         {
-            const std::string& rhs_col_name = cond.rhs_col.col_name;
-            ColType rhs_type;
-            int rhs_offset;
-            for(auto& col : cols)
-            {
-                if(strcmp(col.name.c_str(), rhs_col_name.c_str()) == 0)
-                {
-                    rhs_type = col.type;
-                    rhs_offset = col.offset;
-                    break;
-                }
-            }
-            rhs_val = build_value(rhs_type, rhs_offset, rec);
+            // ColType rhs_type;
+            // int rhs_offset;
+            // for(auto& col : cols)
+            // {
+            //     if(strcmp(col.name.c_str(), rhs_col_name.c_str()) == 0)
+            //     {
+            //         rhs_type = col.type;
+            //         rhs_offset = col.offset;
+            //         break;
+            //     }
+            // }
+            auto rhs_match_col = AbstractExecutor::get_col(cols, cond.rhs_col);
+            rhs_val = build_value(rhs_match_col->type, rhs_match_col->offset, rec);
         }
         // 2. 类型转换
         if(lhs_val.type != rhs_val.type)
