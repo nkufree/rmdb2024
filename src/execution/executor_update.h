@@ -24,6 +24,7 @@ class UpdateExecutor : public AbstractExecutor {
     std::string tab_name_;
     std::vector<SetClause> set_clauses_;
     SmManager *sm_manager_;
+    std::vector<size_t> set_idxs_;
 
    public:
     UpdateExecutor(SmManager *sm_manager, const std::string &tab_name, std::vector<SetClause> set_clauses,
@@ -36,9 +37,30 @@ class UpdateExecutor : public AbstractExecutor {
         conds_ = conds;
         rids_ = rids;
         context_ = context;
+        for(size_t i = 0; i < set_clauses_.size(); i++) {
+            auto pos = get_col(tab_.cols, set_clauses_[i].lhs);
+            set_idxs_.push_back(pos - tab_.cols.begin());
+            if (pos->type != set_clauses_[i].rhs.type) {
+                ConditionCheck::value_transfer(set_clauses_[i].rhs, pos->type);
+            }
+            set_clauses_[i].rhs.init_raw(pos->len);
+        }
     }
     std::unique_ptr<RmRecord> Next() override {
-        
+        for(auto &rid : rids_) {
+            auto rec = fh_->get_record(rid, context_);
+            if (rec == nullptr) {
+                throw RecordNotFoundError(rid.page_no, rid.slot_no);
+            }
+            if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
+                continue;
+            for (size_t i = 0; i < set_clauses_.size(); i++) {
+                auto &col = tab_.cols[set_idxs_[i]];
+                auto &val = set_clauses_[i].rhs;
+                memcpy(rec->data + col.offset, val.raw->data, col.len);
+            }
+            fh_->update_record(rid, rec->data, context_);
+        }
         return nullptr;
     }
 

@@ -58,6 +58,7 @@ class SeqScanExecutor : public AbstractExecutor {
                 break;
             scan_->next();
         }
+        rid_ = scan_->rid();
     }
 
     void nextTuple() override {
@@ -74,10 +75,11 @@ class SeqScanExecutor : public AbstractExecutor {
             }
             scan_->next();
         }
+        rid_ = scan_->rid();
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return fh_->get_record(scan_->rid(), context_);
+        return fh_->get_record(rid_, context_);
     }
 
     Rid &rid() override { return rid_; }

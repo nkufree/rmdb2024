@@ -29,6 +29,7 @@ public:
                 break;
             }
         }
+        
         Value lhs_val = build_value(lhs_type, lhs_offset, rec);
         Value rhs_val = cond.rhs_val;
         if(!cond.is_rhs_val)
@@ -65,6 +66,25 @@ public:
         }
         // 3. 比较
         return compare_value(lhs_val, rhs_val, cond.op);
+    }
+
+    // 将val2的类型转换为val1的类型
+    static void value_transfer(Value& val, ColType type)
+    {
+        if(val.type == type)
+            return;
+        if(val.type == ColType::TYPE_INT && type == ColType::TYPE_FLOAT)
+        {
+            val.set_float(val.int_val);
+        }
+        else if(val.type == ColType::TYPE_FLOAT && type == ColType::TYPE_INT)
+        {
+            val.set_int(val.float_val);
+        }
+        else
+        {
+            throw IncompatibleTypeError(coltype2str(val.type), coltype2str(type));
+        }
     }
 private:
     static Value build_value(ColType col_type, int offset, const std::unique_ptr<RmRecord>& rec)
@@ -121,7 +141,7 @@ private:
             return lhs.float_val < rhs.float_val;
             break;
         case ColType::TYPE_STRING:
-            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) == -1;
+            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) < 0;
             break;
         default:
             break;
@@ -142,7 +162,7 @@ private:
             return lhs.float_val > rhs.float_val;
             break;
         case ColType::TYPE_STRING:
-            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) == 1;
+            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) > 0;
             break;
         default:
             break;

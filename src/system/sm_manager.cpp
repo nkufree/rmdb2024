@@ -85,7 +85,20 @@ void SmManager::drop_db(const std::string& db_name) {
  * @param {string&} db_name 数据库名称，与文件夹同名
  */
 void SmManager::open_db(const std::string& db_name) {
-    
+    if (!is_dir(db_name)) {
+        throw DatabaseNotFoundError(db_name);
+    }
+    if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
+        throw UnixError();
+    }
+    std::ifstream ifs(DB_META_NAME);
+    ifs >> db_;
+    // 打开所有表的文件
+    for (auto &entry : db_.tabs_) {
+        const std::string &tab_name = entry.first;
+        fhs_.emplace(tab_name, rm_manager_->open_file(tab_name));
+    }
+    // TODO(zzx): 打开所有索引的文件
 }
 
 /**
@@ -102,6 +115,7 @@ void SmManager::flush_meta() {
  */
 void SmManager::close_db() {
     // TODO(zzx): 先这样写，后续再补充
+    flush_meta();
     buffer_pool_manager_->flush_all_pages();
 }
 
