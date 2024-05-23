@@ -101,7 +101,8 @@ void SmManager::flush_meta() {
  * @description: 关闭数据库并把数据落盘
  */
 void SmManager::close_db() {
-    
+    // TODO(zzx): 先这样写，后续再补充
+    buffer_pool_manager_->flush_all_pages();
 }
 
 /**
@@ -188,7 +189,13 @@ void SmManager::create_table(const std::string& tab_name, const std::vector<ColD
  * @param {Context*} context
  */
 void SmManager::drop_table(const std::string& tab_name, Context* context) {
-    
+    if(!db_.is_table(tab_name)) {
+        throw TableNotFoundError(tab_name);
+    }
+    rm_manager_->destroy_file(tab_name);
+    db_.tabs_.erase(tab_name);
+    fhs_.erase(tab_name);
+    flush_meta();
 }
 
 /**

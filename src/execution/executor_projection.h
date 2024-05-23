@@ -39,13 +39,27 @@ class ProjectionExecutor : public AbstractExecutor {
         len_ = curr_offset;
     }
 
-    void beginTuple() override {}
+    void beginTuple() override { prev_->beginTuple(); }
 
-    void nextTuple() override {}
+    void nextTuple() override { prev_->nextTuple(); }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        // TODO(zzx): 可以优化，如果投影的是表中的全部字段则直接返回
+        auto rec = prev_->Next();
+        auto &prev_cols = prev_->cols();
+        std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
+        int curr_offset = 0;
+        for (size_t i = 0; i < cols_.size(); i++){
+            size_t col_offset = prev_cols[sel_idxs_[i]].offset;
+            memcpy(new_rec->data + curr_offset, rec->data + col_offset, cols_[i].len);
+            curr_offset += cols_[i].len;
+        }
+        return new_rec;
     }
+
+    bool is_end() const override { return prev_->is_end(); }
+
+    const std::vector<ColMeta> &cols() const override { return cols_; }
 
     Rid &rid() override { return _abstract_rid; }
 };

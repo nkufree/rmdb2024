@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
+#include "condition_check.h"
 
 class SeqScanExecutor : public AbstractExecutor {
    private:
@@ -29,6 +30,7 @@ class SeqScanExecutor : public AbstractExecutor {
     std::unique_ptr<RecScan> scan_;     // table_iterator
 
     SmManager *sm_manager_;
+
 
    public:
     SeqScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, Context *context) {
@@ -46,16 +48,41 @@ class SeqScanExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-        
+        scan_ = std::make_unique<RmScan>(fh_);
+        // rid_ = scan_->rid();
+        std::unique_ptr<RmRecord> rec;
+        while (!scan_->is_end())
+        {
+            rec = fh_->get_record(scan_->rid(), context_);
+            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+                break;
+            scan_->next();
+        }
     }
 
     void nextTuple() override {
-        
+        // scan_->next();
+        // rid_ = scan_->rid();
+        std::unique_ptr<RmRecord> rec;
+        scan_->next();
+        while (!scan_->is_end())
+        {
+            rec = fh_->get_record(scan_->rid(), context_);
+            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            {
+                break;
+            }
+            scan_->next();
+        }
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        return fh_->get_record(scan_->rid(), context_);
     }
 
     Rid &rid() override { return rid_; }
+
+    bool is_end() const override { return scan_->is_end(); }
+
+    const std::vector<ColMeta> &cols() const override { return cols_; }
 };

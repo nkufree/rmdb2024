@@ -255,3 +255,17 @@ void BufferPoolManager::flush_all_pages(int fd)
         }
     }
 }
+
+void BufferPoolManager::flush_all_pages()
+{
+    std::scoped_lock lock{latch_};
+    for (auto &it : page_table_)
+    {
+        Page *page = &pages_[it.second];
+        if (page->is_dirty_)
+        {
+            disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
+            page->is_dirty_ = false;
+        }
+    }
+}
