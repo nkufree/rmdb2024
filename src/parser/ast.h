@@ -217,6 +217,7 @@ struct JoinExpr : public TreeNode {
 struct SelectStmt : public TreeNode {
     std::vector<std::shared_ptr<Col>> cols;
     std::vector<std::string> tabs;
+    std::vector<std::shared_ptr<BinaryExpr>> on_conds;
     std::vector<std::shared_ptr<BinaryExpr>> conds;
     std::vector<std::shared_ptr<JoinExpr>> jointree;
 
@@ -227,9 +228,10 @@ struct SelectStmt : public TreeNode {
 
     SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
                std::vector<std::string> tabs_,
+               std::vector<std::shared_ptr<BinaryExpr>> on_conds_,
                std::vector<std::shared_ptr<BinaryExpr>> conds_,
                std::shared_ptr<OrderBy> order_) :
-            cols(std::move(cols_)), tabs(std::move(tabs_)), conds(std::move(conds_)), 
+            cols(std::move(cols_)), tabs(std::move(tabs_)), on_conds(std::move(on_conds_)), conds(std::move(conds_)), 
             order(std::move(order_)) {
                 has_sort = (bool)order;
             }

@@ -164,8 +164,11 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     {
         return table_scan_executors[0];
     }
+    // 获取on条件
+    auto on_conds = std::move(query->on_conds);
     // 获取where条件
     auto conds = std::move(query->conds);
+    conds.insert(conds.end(), on_conds.begin(), on_conds.end());
     std::shared_ptr<Plan> table_join_executors;
     
     int scantbl[tables.size()];

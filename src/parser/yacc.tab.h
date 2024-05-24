@@ -35,8 +35,8 @@
    especially those whose name start with YY_ or yy_.  They are
    private implementation details that can be changed or removed.  */
 
-#ifndef YY_YY_HOME_ZZX_DBLAB_DB2024_NKU_RMDB_SRC_PARSER_YACC_TAB_H_INCLUDED
-# define YY_YY_HOME_ZZX_DBLAB_DB2024_NKU_RMDB_SRC_PARSER_YACC_TAB_H_INCLUDED
+#ifndef YY_YY_YACC_TAB_H_INCLUDED
+# define YY_YY_YACC_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -87,15 +87,16 @@ extern int yydebug;
     ORDER_BY = 288,                /* ORDER_BY  */
     ENABLE_NESTLOOP = 289,         /* ENABLE_NESTLOOP  */
     ENABLE_SORTMERGE = 290,        /* ENABLE_SORTMERGE  */
-    LEQ = 291,                     /* LEQ  */
-    NEQ = 292,                     /* NEQ  */
-    GEQ = 293,                     /* GEQ  */
-    T_EOF = 294,                   /* T_EOF  */
-    IDENTIFIER = 295,              /* IDENTIFIER  */
-    VALUE_STRING = 296,            /* VALUE_STRING  */
-    VALUE_INT = 297,               /* VALUE_INT  */
-    VALUE_FLOAT = 298,             /* VALUE_FLOAT  */
-    VALUE_BOOL = 299               /* VALUE_BOOL  */
+    ON = 291,                      /* ON  */
+    LEQ = 292,                     /* LEQ  */
+    NEQ = 293,                     /* NEQ  */
+    GEQ = 294,                     /* GEQ  */
+    T_EOF = 295,                   /* T_EOF  */
+    IDENTIFIER = 296,              /* IDENTIFIER  */
+    VALUE_STRING = 297,            /* VALUE_STRING  */
+    VALUE_INT = 298,               /* VALUE_INT  */
+    VALUE_FLOAT = 299,             /* VALUE_FLOAT  */
+    VALUE_BOOL = 300               /* VALUE_BOOL  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -122,4 +123,4 @@ struct YYLTYPE
 int yyparse (void);
 
 
-#endif /* !YY_YY_HOME_ZZX_DBLAB_DB2024_NKU_RMDB_SRC_PARSER_YACC_TAB_H_INCLUDED  */
+#endif /* !YY_YY_YACC_TAB_H_INCLUDED  */

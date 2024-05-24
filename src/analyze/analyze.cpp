@@ -23,6 +23,13 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         // 处理表名
         query->tables = std::move(x->tabs);
         /** TODO: 检查表是否存在 */
+        for (auto &tab_name : query->tables)
+        {
+            if (!sm_manager_->db_.is_table(tab_name))
+            {
+                throw TableNotFoundError(tab_name);
+            }
+        }
 
         // 处理target list，再target list中添加上表名，例如 a.id
         for (auto &sv_sel_col : x->cols) {
@@ -44,6 +51,9 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
                 sel_col = check_column(all_cols, sel_col);  // 列元数据校验
             }
         }
+        // 处理on条件
+        get_clause(x->on_conds, query->on_conds);
+        check_clause(query->tables, query->on_conds);
         //处理where条件
         get_clause(x->conds, query->conds);
         check_clause(query->tables, query->conds);
@@ -120,6 +130,33 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
             cond.rhs_col = {.tab_name = rhs_col->tab_name, .col_name = rhs_col->col_name};
         }
         conds.push_back(cond);
+    }
+}
+
+void Analyze::check_on_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds) {
+    // auto all_cols = get_all_cols(tab_names);
+    std::vector<ColMeta> all_cols;
+    get_all_cols(tab_names, all_cols);
+    // Get raw values in where clause
+    for (auto &cond : conds) {
+        // Infer table name from column name
+        cond.lhs_col = check_column(all_cols, cond.lhs_col);
+        if (!cond.is_rhs_val) {
+            cond.rhs_col = check_column(all_cols, cond.rhs_col);
+        }
+        TabMeta &lhs_tab = sm_manager_->db_.get_table(cond.lhs_col.tab_name);
+        auto lhs_col = lhs_tab.get_col(cond.lhs_col.col_name);
+        ColType lhs_type = lhs_col->type;
+        ColType rhs_type;
+        if (cond.is_rhs_val) {
+            cond.rhs_val.init_raw(lhs_col->len);
+            rhs_type = cond.rhs_val.type;
+        } else {
+            throw InternalError("Unexpected on clause");
+        }
+        if (!value_type_match(lhs_type, rhs_type)) {
+            throw IncompatibleTypeError(coltype2str(lhs_type), coltype2str(rhs_type));
+        }
     }
 }
 
