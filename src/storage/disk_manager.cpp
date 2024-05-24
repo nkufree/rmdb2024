@@ -133,7 +133,7 @@ void DiskManager::create_file(const std::string &path)
     // 注意不能重复创建相同文件
     if(is_file(path))
     {
-        throw FileExistsError("File already exists: " + path);
+        throw FileExistsError(path);
     }
     int fd = open(path.c_str(), O_CREAT, 0666);
     if (fd == -1)
@@ -177,12 +177,12 @@ int DiskManager::open_file(const std::string &path)
     // 注意不能重复打开相同文件，并且需要更新文件打开列表
     if (path2fd_.find(path) != path2fd_.end())
     {
-        throw FileExistsError("File already open: " + path);
+        throw FileNotClosedError(path);
     }
     int fd = open(path.c_str(), O_RDWR);
     if (fd == -1)
     {
-        throw FileNotFoundError("Failed to open file: " + path);
+        throw FileNotFoundError(path);
     }
     path2fd_[path] = fd;
     fd2path_[fd] = path;

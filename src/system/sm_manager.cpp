@@ -206,6 +206,8 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     if(!db_.is_table(tab_name)) {
         throw TableNotFoundError(tab_name);
     }
+    auto &fh = fhs_[tab_name];
+    rm_manager_->close_file(fh.get());  // 关闭文件
     rm_manager_->destroy_file(tab_name);
     db_.tabs_.erase(tab_name);
     fhs_.erase(tab_name);

@@ -20,7 +20,7 @@ RmScan::RmScan(const RmFileHandle *file_handle) : file_handle_(file_handle) {
     // 初始化file_handle和rid（指向第一个存放了记录的位置）
     int i = 1;
     RmPageHandle page_handle = file_handle_->fetch_page_handle(i);
-    while (page_handle.page_hdr->num_records == 0)
+    while (page_handle.page_hdr->num_records == 0 && i < file_handle_->file_hdr_.num_pages - 1)
     {
         file_handle_->buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), false);
         i++;
@@ -28,6 +28,10 @@ RmScan::RmScan(const RmFileHandle *file_handle) : file_handle_(file_handle) {
     }
     int slot_no = Bitmap::first_bit(1, page_handle.bitmap, file_handle_->file_hdr_.num_records_per_page);
     rid_ = {i, slot_no};
+    if(slot_no == file_handle_->file_hdr_.num_records_per_page)
+    {
+        rid_ = {i, -1};
+    }
     file_handle_->buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), false);
 }
 
