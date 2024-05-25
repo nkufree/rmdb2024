@@ -178,9 +178,9 @@ struct OrderBy : public TreeNode
 
 struct InsertStmt : public TreeNode {
     std::string tab_name;
-    std::vector<std::shared_ptr<Value>> vals;
+    std::vector<std::vector<std::shared_ptr<Value>>> vals;
 
-    InsertStmt(std::string tab_name_, std::vector<std::shared_ptr<Value>> vals_) :
+    InsertStmt(std::string tab_name_, std::vector<std::vector<std::shared_ptr<Value>>> vals_) :
             tab_name(std::move(tab_name_)), vals(std::move(vals_)) {}
 };
 
@@ -268,6 +268,7 @@ struct SemValue {
 
     std::shared_ptr<Value> sv_val;
     std::vector<std::shared_ptr<Value>> sv_vals;
+    std::vector<std::vector<std::shared_ptr<Value>>> sv_vals_list;
 
     std::shared_ptr<Col> sv_col;
     std::vector<std::shared_ptr<Col>> sv_cols;

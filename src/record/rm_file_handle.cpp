@@ -157,6 +157,7 @@ RmPageHandle RmFileHandle::create_new_page_handle() {
     page_handle.page_hdr->next_free_page_no = file_hdr_.first_free_page_no;
     file_hdr_.first_free_page_no = page_id.page_no;
     return page_handle;
+    buffer_pool_manager_->mark_dirty(page);
 }
 
 /**

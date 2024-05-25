@@ -116,6 +116,11 @@ void SmManager::flush_meta() {
 void SmManager::close_db() {
     // TODO(zzx): 先这样写，后续再补充
     flush_meta();
+    // 将表头写入磁盘
+    for (auto &entry : fhs_) {
+        auto &fh = entry.second;
+        rm_manager_->close_file(fh.get());
+    }
     buffer_pool_manager_->flush_all_pages();
 }
 

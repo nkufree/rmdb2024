@@ -138,7 +138,7 @@ class DMLPlan : public Plan
 {
     public:
         DMLPlan(PlanTag tag, std::shared_ptr<Plan> subplan,std::string tab_name,
-                std::vector<Value> values, std::vector<Condition> conds,
+                std::vector<std::vector<Value>> values, std::vector<Condition> conds,
                 std::vector<SetClause> set_clauses)
         {
             Plan::tag = tag;
@@ -151,7 +151,7 @@ class DMLPlan : public Plan
         ~DMLPlan(){}
         std::shared_ptr<Plan> subplan_;
         std::string tab_name_;
-        std::vector<Value> values_;
+        std::vector<std::vector<Value>> values_;
         std::vector<Condition> conds_;
         std::vector<SetClause> set_clauses_;
 };

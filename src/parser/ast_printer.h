@@ -63,6 +63,16 @@ private:
     }
 
     template<typename T>
+    static void print_node_list_list(std::vector<T> nodes, int offset) {
+        std::cout << offset2string(offset);
+        offset += 2;
+        std::cout << "LIST\n";
+        for (auto &node : nodes) {
+            print_node_list(node, offset);
+        }
+    }
+
+    template<typename T>
     static void print_node_list(std::vector<T> nodes, int offset) {
         std::cout << offset2string(offset);
         offset += 2;
@@ -134,7 +144,7 @@ private:
         } else if (auto x = std::dynamic_pointer_cast<InsertStmt>(node)) {
             std::cout << "INSERT\n";
             print_val(x->tab_name, offset);
-            print_node_list(x->vals, offset);
+            print_node_list_list(x->vals, offset);
         } else if (auto x = std::dynamic_pointer_cast<DeleteStmt>(node)) {
             std::cout << "DELETE\n";
             print_val(x->tab_name, offset);

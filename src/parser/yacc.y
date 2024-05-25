@@ -40,7 +40,8 @@ WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_CO
 %type <sv_comp_op> op
 %type <sv_expr> expr
 %type <sv_val> value
-%type <sv_vals> valueList
+%type <sv_vals> valueList oneValue
+%type <sv_vals_list> valuesList
 %type <sv_str> tbName colName
 %type <sv_strs> tableList colNameList
 %type <sv_col> col
@@ -142,9 +143,9 @@ ddl:
     ;
 
 dml:
-        INSERT INTO tbName VALUES '(' valueList ')'
+        INSERT INTO tbName VALUES valuesList
     {
-        $$ = std::make_shared<InsertStmt>($3, $6);
+        $$ = std::make_shared<InsertStmt>($3, $5);
     }
     |   DELETE FROM tbName optWhereClause
     {
@@ -157,6 +158,24 @@ dml:
     |   SELECT selector FROM tableList opOnClause optWhereClause opt_order_clause
     {
         $$ = std::make_shared<SelectStmt>($2, $4, $5, $6, $7);
+    }
+    ;
+
+oneValue:
+    '(' valueList ')'
+    {
+        $$ = $2;
+    }
+    ;
+
+valuesList:
+        oneValue
+    {
+        $$ = std::vector<std::vector<std::shared_ptr<Value>>>{$1};
+    }
+    |   valuesList ',' oneValue
+    {
+        $$.push_back($3);
     }
     ;
 
