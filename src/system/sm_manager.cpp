@@ -88,9 +88,9 @@ void SmManager::open_db(const std::string& db_name) {
     if (!is_dir(db_name)) {
         throw DatabaseNotFoundError(db_name);
     }
-    if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
-        throw UnixError();
-    }
+    // if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
+    //     throw UnixError();
+    // }
     std::ifstream ifs(DB_META_NAME);
     ifs >> db_;
     // 打开所有表的文件
@@ -121,7 +121,7 @@ void SmManager::close_db() {
         auto &fh = entry.second;
         rm_manager_->close_file(fh.get());
     }
-    buffer_pool_manager_->flush_all_pages();
+    // buffer_pool_manager_->flush_all_pages();
 }
 
 /**
