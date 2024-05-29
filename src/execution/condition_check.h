@@ -120,7 +120,7 @@ private:
             return lhs.float_val == rhs.float_val;
             break;
         case ColType::TYPE_STRING:
-            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) == 0;
+            return lhs.str_val == rhs.str_val;
             break;
         default:
             break;
@@ -141,7 +141,7 @@ private:
             return lhs.float_val < rhs.float_val;
             break;
         case ColType::TYPE_STRING:
-            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) < 0;
+            return lhs.str_val < rhs.str_val;
             break;
         default:
             break;
@@ -162,7 +162,7 @@ private:
             return lhs.float_val > rhs.float_val;
             break;
         case ColType::TYPE_STRING:
-            return strcmp(lhs.str_val.c_str(), rhs.str_val.c_str()) > 0;
+            return lhs.str_val > rhs.str_val;
             break;
         default:
             break;
@@ -187,10 +187,10 @@ private:
             return value_greater(lhs, rhs);
             break;
         case CompOp::OP_LE:
-            return value_less(lhs, rhs) || value_equal(lhs, rhs);
+            return !value_greater(lhs, rhs);
             break;
         case CompOp::OP_GE:
-            return value_greater(lhs, rhs) || value_equal(lhs, rhs);
+            return !value_less(lhs, rhs);
             break;
         default:
             break;
