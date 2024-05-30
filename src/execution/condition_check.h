@@ -53,7 +53,8 @@ public:
         {
             if(lhs_val.type == ColType::TYPE_INT && rhs_val.type == ColType::TYPE_FLOAT)
             {
-                lhs_val.set_float(lhs_val.int_val);
+                // lhs_val.set_float(lhs_val.int_val);
+                rhs_val.set_int(rhs_val.float_val);
             }
             else if(lhs_val.type == ColType::TYPE_FLOAT && rhs_val.type == ColType::TYPE_INT)
             {
