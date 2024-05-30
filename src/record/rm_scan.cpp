@@ -18,6 +18,11 @@ See the Mulan PSL v2 for more details. */
 RmScan::RmScan(const RmFileHandle *file_handle) : file_handle_(file_handle) {
     // Todo:
     // 初始化file_handle和rid（指向第一个存放了记录的位置）
+    if(file_handle_->file_hdr_.num_pages == 1)
+    {
+        rid_ = {1, -1};
+        return;
+    }
     int i = 1;
     RmPageHandle page_handle = file_handle_->fetch_page_handle(i);
     while (page_handle.page_hdr->num_records == 0 && i < file_handle_->file_hdr_.num_pages - 1)
