@@ -48,7 +48,7 @@ class InsertExecutor : public AbstractExecutor {
                 auto &col = tab_.cols[i];
                 auto &val = values[i];
                 if (col.type != val.type) {
-                ConditionCheck::value_transfer(val, col.type);
+                val.value_cast(col.type);
                 }
                 val.init_raw(col.len);
                 memcpy(rec.data + col.offset, val.raw->data, col.len);

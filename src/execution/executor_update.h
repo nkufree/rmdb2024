@@ -41,7 +41,7 @@ class UpdateExecutor : public AbstractExecutor {
             auto pos = get_col(tab_.cols, set_clauses_[i].lhs);
             set_idxs_.push_back(pos - tab_.cols.begin());
             if (pos->type != set_clauses_[i].rhs.type) {
-                ConditionCheck::value_transfer(set_clauses_[i].rhs, pos->type);
+                set_clauses_[i].rhs.value_cast(pos->type);
             }
             set_clauses_[i].rhs.init_raw(pos->len);
         }
