@@ -121,6 +121,11 @@ void SmManager::close_db() {
         auto &fh = entry.second;
         rm_manager_->close_file(fh.get());
     }
+    fhs_.clear();
+    db_.name_.clear();
+    if(chdir("..") < 0) {
+        throw UnixError();
+    }
     // buffer_pool_manager_->flush_all_pages();
 }
 
