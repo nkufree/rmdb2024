@@ -37,7 +37,7 @@ struct Value {
     std::string str_val;  // string value
 
     std::shared_ptr<RmRecord> raw;  // raw record buffer
-
+    int str_len;  // length of string value
     void set_int(int int_val_) {
         type = TYPE_INT;
         int_val = int_val_;
@@ -91,7 +91,7 @@ struct Value {
             case TYPE_FLOAT:
                 return float_val == rhs.float_val;
             case TYPE_STRING:
-                return str_val == rhs.str_val;
+                return strncmp(str_val.c_str(), rhs.str_val.c_str(), str_len) == 0;
             default:
                 throw InternalError("Unexpected value type");
         }
@@ -107,7 +107,7 @@ struct Value {
             case TYPE_FLOAT:
                 return float_val < rhs.float_val;
             case TYPE_STRING:
-                return str_val < rhs.str_val;
+                return strncmp(str_val.c_str(), rhs.str_val.c_str(), str_len) < 0;
             default:
                 throw InternalError("Unexpected value type");
         }

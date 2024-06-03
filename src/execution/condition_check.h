@@ -13,12 +13,12 @@ public:
     static bool check_single_condition(const Condition& cond, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
     {
         auto lhs_match_col = AbstractExecutor::get_col(cols, cond.lhs_col);
-        Value lhs_val = build_value(lhs_match_col->type, lhs_match_col->offset, rec);
+        Value lhs_val = build_value(lhs_match_col->type, lhs_match_col->offset, rec, lhs_match_col->len);
         Value rhs_val = cond.rhs_val;
         if(!cond.is_rhs_val)
         {
             auto rhs_match_col = AbstractExecutor::get_col(cols, cond.rhs_col);
-            rhs_val = build_value(rhs_match_col->type, rhs_match_col->offset, rec);
+            rhs_val = build_value(rhs_match_col->type, rhs_match_col->offset, rec, rhs_match_col->len);
         }
         // 2. 类型转换
         if(lhs_val.type != rhs_val.type)
@@ -41,7 +41,7 @@ public:
         return cond.check_condition(lhs_val, rhs_val);
     }
 private:
-    static Value build_value(ColType col_type, int offset, const std::unique_ptr<RmRecord>& rec)
+    static Value build_value(ColType col_type, int offset, const std::unique_ptr<RmRecord>& rec, int len)
     {
         Value val;
         switch (col_type)
@@ -54,6 +54,7 @@ private:
             break;
         case ColType::TYPE_STRING:
             val.set_str(std::string((char*)(uintptr_t)(rec->data + offset)));
+            val.str_len = len;
             break;
         default:
             break;
