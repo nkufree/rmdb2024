@@ -97,6 +97,12 @@ struct DescTable : public TreeNode {
     DescTable(std::string tab_name_) : tab_name(std::move(tab_name_)) {}
 };
 
+struct ShowIndex : public TreeNode {
+    std::string tab_name;
+
+    ShowIndex(std::string tab_name_) : tab_name(std::move(tab_name_)) {}
+};
+
 struct CreateIndex : public TreeNode {
     std::string tab_name;
     std::vector<std::string> col_names;

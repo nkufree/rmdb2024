@@ -43,6 +43,7 @@ class InsertExecutor : public AbstractExecutor {
     std::unique_ptr<RmRecord> Next() override {
         // Make record buffer
         RmRecord rec(fh_->get_file_hdr().record_size);
+        char* key = new char[tab_.get_col_total_len()];
         for(auto &values : values_) {
             for (size_t i = 0; i < values.size(); i++) {
                 auto &col = tab_.cols[i];
@@ -60,7 +61,6 @@ class InsertExecutor : public AbstractExecutor {
             for(size_t i = 0; i < tab_.indexes.size(); ++i) {
                 auto& index = tab_.indexes[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                char* key = new char[index.col_tot_len];
                 int offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
                     memcpy(key + offset, rec.data + index.cols[i].offset, index.cols[i].len);
@@ -69,6 +69,7 @@ class InsertExecutor : public AbstractExecutor {
                 ih->insert_entry(key, rid_, context_->txn_);
             }
         }
+        delete[] key;
         return nullptr;
     }
     Rid &rid() override { return rid_; }

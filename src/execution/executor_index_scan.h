@@ -33,7 +33,8 @@ class IndexScanExecutor : public AbstractExecutor {
     std::unique_ptr<RecScan> scan_;
 
     SmManager *sm_manager_;
-
+    int equal_col_num;                          // 等值且在索引中连续的条件的个数
+    std::unique_ptr<IxIndexHandle> ih;
    public:
     IndexScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, std::vector<std::string> index_col_names,
                     Context *context) {
@@ -51,7 +52,9 @@ class IndexScanExecutor : public AbstractExecutor {
         std::map<CompOp, CompOp> swap_op = {
             {OP_EQ, OP_EQ}, {OP_NE, OP_NE}, {OP_LT, OP_GT}, {OP_GT, OP_LT}, {OP_LE, OP_GE}, {OP_GE, OP_LE},
         };
-
+        fed_conds_.clear();
+        equal_col_num = 0;
+        bool still_equal = true;
         for (auto &cond : conds_) {
             if (cond.lhs_col.tab_name != tab_name_) {
                 // lhs is on other table, now rhs must be on this table
@@ -60,21 +63,111 @@ class IndexScanExecutor : public AbstractExecutor {
                 std::swap(cond.lhs_col, cond.rhs_col);
                 cond.op = swap_op.at(cond.op);
             }
+            if(cond.op == OP_EQ && still_equal) {
+                equal_col_num++;
+            }
+            else {
+                still_equal = false;
+                fed_conds_.push_back(cond);
+            }
         }
-        fed_conds_ = conds_;
+        // fed_conds_ = conds_;
     }
 
     void beginTuple() override {
-        
+        ih = std::move(sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_)));
+        // 遍历检索条件，找出索引条件的下限和上限
+        // TODO(zzx)：还可以根据条件进一步限定范围
+        char* key = new char[index_meta_.col_tot_len];
+        build_equal_key(key);
+        Iid lower = ih->lower_bound(key, equal_col_num);
+        Iid upper = ih->upper_bound(key, equal_col_num);
+        scan_ = std::make_unique<IxScan>(ih.get(), lower, upper, sm_manager_->get_bpm());
+        // 遍历获取第一个元素
+        std::unique_ptr<RmRecord> rec;
+        while (!scan_->is_end())
+        {
+            rec = fh_->get_record(scan_->rid(), context_);
+            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+                break;
+            scan_->next();
+        }
+        rid_ = scan_->rid();
     }
 
     void nextTuple() override {
-        
+        std::unique_ptr<RmRecord> rec;
+        scan_->next();
+        while (!scan_->is_end())
+        {
+            rec = fh_->get_record(scan_->rid(), context_);
+            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            {
+                break;
+            }
+            scan_->next();
+        }
+        rid_ = scan_->rid();
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        return fh_->get_record(rid_, context_);
     }
 
     Rid &rid() override { return rid_; }
+
+    bool is_end() const override { return scan_->is_end(); }
+
+    size_t tupleLen() const override { return len_; }
+
+    const std::vector<ColMeta> &cols() const override { return cols_; }
+
+private:
+    int build_equal_key(char* key) {
+        int offset = 0;
+        for(int i = 0; i < equal_col_num; i++) {
+            conds_[i].rhs_val.value_cast(index_meta_.cols[i].type);
+            switch (index_meta_.cols[i].type)
+            {
+            case TYPE_INT:
+                memcpy(key + offset, (void*)&conds_[i].rhs_val.int_val, sizeof(int));
+                break;
+            case TYPE_FLOAT:
+                memcpy(key + offset, (void*)&conds_[i].rhs_val.float_val, sizeof(float));
+                break;
+            case TYPE_STRING:
+                memset(key + offset, 0, index_meta_.cols[i].len);
+                memcpy(key + offset, conds_[i].rhs_val.str_val.c_str(), conds_[i].rhs_val.str_val.size());
+                break;
+            default:
+                break;
+            }
+            offset += index_meta_.cols[i].len;
+        }
+        return offset;
+    }
+
+    void build_range_key(char* key, int start, bool is_lower_bound) {
+        // TODO(zzx): 待完善
+        int offset = start;
+        for(int i = equal_col_num; i < (int)index_meta_.col_num; i++) {
+            conds_[i].rhs_val.value_cast(index_meta_.cols[i].type);
+            switch (index_meta_.cols[i].type)
+            {
+            case TYPE_INT:
+                memcpy(key + offset, (void*)&conds_[i].rhs_val.int_val, sizeof(int));
+                break;
+            case TYPE_FLOAT:
+                memcpy(key + offset, (void*)&conds_[i].rhs_val.float_val, sizeof(float));
+                break;
+            case TYPE_STRING:
+                memset(key + offset, 0, index_meta_.cols[i].len);
+                memcpy(key + offset, conds_[i].rhs_val.str_val.c_str(), conds_[i].rhs_val.str_val.size());
+                break;
+            default:
+                break;
+            }
+            offset += index_meta_.cols[i].len;
+        }
+    }
 };

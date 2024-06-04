@@ -58,7 +58,7 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         get_clause(x->conds, query->conds);
         check_clause(query->tables, query->conds);
     } else if (auto x = std::dynamic_pointer_cast<ast::UpdateStmt>(parse)) {
-        /** TODO: */
+        /** TODO: (done)*/
         for(auto& sv_set : x->set_clauses){
             SetClause set_clause;
             set_clause.lhs = {.tab_name = x->tab_name, .col_name = sv_set->col_name};

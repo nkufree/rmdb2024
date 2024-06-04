@@ -25,7 +25,7 @@ class UpdateExecutor : public AbstractExecutor {
     std::vector<SetClause> set_clauses_;
     SmManager *sm_manager_;
     std::vector<size_t> set_idxs_;
-
+    std::vector<IndexMeta> update_indexes_;
    public:
     UpdateExecutor(SmManager *sm_manager, const std::string &tab_name, std::vector<SetClause> set_clauses,
                    std::vector<Condition> conds, std::vector<Rid> rids, Context *context) {
@@ -45,8 +45,19 @@ class UpdateExecutor : public AbstractExecutor {
             }
             set_clauses_[i].rhs.init_raw(pos->len);
         }
+        for(auto &idx : tab_.indexes) {
+            for(auto &col : idx.cols) {
+                for(auto &set_clause : set_clauses_) {
+                    if(set_clause.lhs.col_name == col.name) {
+                        update_indexes_.push_back(idx);
+                        break;
+                    }
+                }
+            }
+        }
     }
     std::unique_ptr<RmRecord> Next() override {
+        char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
             if (rec == nullptr) {
@@ -54,13 +65,34 @@ class UpdateExecutor : public AbstractExecutor {
             }
             if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
                 continue;
+            // 从索引中删除旧的记录
+            for(auto& index: update_indexes_) {
+                auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                int offset = 0;
+                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+                    memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
+                    offset += index.cols[i].len;
+                }
+                ih->delete_entry(key, context_->txn_);
+            }
             for (size_t i = 0; i < set_clauses_.size(); i++) {
                 auto &col = tab_.cols[set_idxs_[i]];
                 auto &val = set_clauses_[i].rhs;
                 memcpy(rec->data + col.offset, val.raw->data, col.len);
             }
             fh_->update_record(rid, rec->data, context_);
+            // 将更新过后的记录插入索引
+            for(auto& index: update_indexes_) {
+                auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                int offset = 0;
+                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+                    memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
+                    offset += index.cols[i].len;
+                }
+                ih->insert_entry(key, rid, context_->txn_);
+            }
         }
+        delete[] key;
         return nullptr;
     }
 
