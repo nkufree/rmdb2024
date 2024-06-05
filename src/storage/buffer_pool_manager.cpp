@@ -269,3 +269,32 @@ void BufferPoolManager::flush_all_pages()
         }
     }
 }
+
+bool BufferPoolManager::delete_all_pages(int fd)
+{
+    std::scoped_lock lock{latch_};
+    for (auto it = page_table_.begin(); it != page_table_.end();)
+    {
+        if (it->first.fd == fd)
+        {
+            Page *page = &pages_[it->second];
+            if (page->pin_count_ != 0)
+            {
+                return false;
+            }
+            if (page->is_dirty_)
+            {
+                disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
+                page->is_dirty_ = false;
+            }
+            page->reset_memory();
+            free_list_.push_back(it->second);
+            it = page_table_.erase(it);
+        }
+        else
+        {
+            it++;
+        }
+    }
+    return true;
+}

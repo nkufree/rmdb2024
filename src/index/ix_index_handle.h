@@ -39,10 +39,9 @@ inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
     }
 }
 
-inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& col_types, const std::vector<int>& col_lens, int col_num = -1) {
+inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& col_types, const std::vector<int>& col_lens) {
     int offset = 0;
-    if(col_num == -1) col_num = col_types.size();
-    for(int i = 0; i < col_num; ++i) {
+    for(size_t i = 0; i < col_types.size(); ++i) {
         int res = ix_compare(a + offset, b + offset, col_types[i], col_lens[i]);
         if(res != 0) return res;
         offset += col_lens[i];
@@ -51,28 +50,35 @@ inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& 
 }
 
 // 二分查找
-inline int ix_binary_search(int left, int right, char* keys, const char*target, const IxFileHdr* file_hdr, int col_num, bool find_left = true) {
-    while(left <= right){
-        int mid = (left + right) / 2;
-        char* curr = keys + mid * file_hdr->col_tot_len_;
-        int comp = ix_compare(curr, target, file_hdr->col_types_, file_hdr->col_lens_, col_num);
-        if(comp == 0){
-            if(find_left) {
-                left = mid;
-            }
-            else {
-                right = mid;
-            }
-        }
-        else if(comp < 0){
-            left = mid + 1;
-        }
-        else{
-            right = mid - 1;
-        }
-    }
-    return left;
-}
+// inline int ix_binary_search(int left, int right, char* keys, const char*target, const IxFileHdr* file_hdr, int col_num, bool find_left = true) {
+//     if(right < left)
+//         return left;
+//     while(left < right){
+//         int mid = (left + right) / 2;
+//         char* curr = keys + mid * file_hdr->col_tot_len_;
+//         int comp = ix_compare(curr, target, file_hdr->col_types_, file_hdr->col_lens_, col_num);
+//         if(comp == 0){
+//             if(find_left) {
+//                 right = mid;
+//             }
+//             else {
+//                 left = mid + 1;
+//             }
+//         }
+//         else if(comp < 0){
+//             left = mid + 1;
+//         }
+//         else{
+//             right = mid;
+//         }
+//     }
+//     int comp = ix_compare(keys + right * file_hdr->col_tot_len_, target, file_hdr->col_types_, file_hdr->col_lens_, col_num);
+//     if(comp < 0)
+//         return right + 1;
+//     else if(comp == 0 && !find_left)
+//         return right + 1;
+//     return right;
+// }
 
 /* 管理B+树中的每个节点 */
 class IxNodeHandle {
@@ -138,21 +144,13 @@ class IxNodeHandle {
 
     int lower_bound(const char *target) const;
 
-    int lower_bound(const char *target, int col_num) const;
-
     int upper_bound(const char *target) const;
-
-    int upper_bound(const char *target, int col_num) const;
 
     void insert_pairs(int pos, const char *key, const Rid *rid, int n);
 
     page_id_t internal_lookup(const char *key);
 
-    page_id_t internal_lookup(const char *key, int col_num);
-
     bool leaf_lookup(const char *key, Rid **value);
-
-    bool leaf_lookup(const char *key, Rid **value, int col_num);
 
     int insert(const char *key, const Rid &value);
 
@@ -214,9 +212,6 @@ class IxIndexHandle {
     std::pair<IxNodeHandle *, bool> find_leaf_page(const char *key, Operation operation, Transaction *transaction,
                                                  bool find_first = false);
 
-    std::pair<IxNodeHandle *, bool> find_leaf_page(const char *key, Operation operation, Transaction *transaction,
-                                                 bool find_first, int col_num);
-
     // for insert
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
 
@@ -238,15 +233,13 @@ class IxIndexHandle {
 
     Iid lower_bound(const char *key);
 
-    Iid lower_bound(const char *key, int col_num);
-
     Iid upper_bound(const char *key);
-
-    Iid upper_bound(const char *key, int col_num);
 
     Iid leaf_end() const;
 
     Iid leaf_begin() const;
+
+    bool clear_pages(){ return buffer_pool_manager_->delete_all_pages(fd_); }
 
    private:
     // 辅助函数

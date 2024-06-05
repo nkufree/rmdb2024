@@ -153,10 +153,13 @@ struct TabMeta {
     }
 
     // 匹配索引，查找最长匹配的索引，返回顺序与索引一致的条件序列
-    bool modify_and_check_index(std::vector<Condition>& conds) {
-        std::unordered_map<std::string, int> col_idx_map;
+    bool modify_and_check_index(std::vector<Condition>& conds, std::vector<std::string>& index_col_names) {
+        std::unordered_map<std::string, std::vector<int>> col_idx_map;
         for(size_t i = 0; i < conds.size(); i++) {
-            col_idx_map[conds[i].lhs_col.col_name] = i;
+            if(col_idx_map.find(conds[i].lhs_col.col_name) == col_idx_map.end())
+                col_idx_map[conds[i].lhs_col.col_name] = std::vector<int>{(int)i};
+            else
+                col_idx_map[conds[i].lhs_col.col_name].push_back(i);
         }
         std::vector<Condition> new_conds;
         int max_match_len = 0;
@@ -179,13 +182,22 @@ struct TabMeta {
         }
         if(max_match_idx == -1) return false;
         IndexMeta& index_meta = indexes[max_match_idx];
+        bool col_end = false;
         for(ColMeta& col: index_meta.cols) {
+            index_col_names.push_back(col.name);
             auto it = col_idx_map.find(col.name);
-            new_conds.push_back(conds[it->second]);
+            if(it == col_idx_map.end() || col_end) {
+                col_end = true;
+                continue;
+            }
+            for(int idx: it->second) {
+                new_conds.push_back(conds[idx]);
+            }
             col_idx_map.erase(it);
         }
         for(auto p : col_idx_map) {
-            new_conds.push_back(conds[p.second]);
+            for(int idx: p.second)
+                new_conds.push_back(conds[idx]);
         }
         conds.swap(new_conds);
         return true;

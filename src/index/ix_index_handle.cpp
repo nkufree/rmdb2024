@@ -22,15 +22,23 @@ int IxNodeHandle::lower_bound(const char *target) const {
     // Todo:
     // 查找当前节点中第一个大于等于target的key，并返回key的位置给上层
     // 提示: 可以采用多种查找方式，如顺序遍历、二分查找等；使用ix_compare()函数进行比较
-    return lower_bound(target, -1);
-}
-
-int IxNodeHandle::lower_bound(const char *target, int col_num) const {
-    // Todo:
-    // 查找当前节点中第一个大于等于target的key，并返回key的位置给上层
-    // 提示: 可以采用多种查找方式，如顺序遍历、二分查找等；使用ix_compare()函数进行比较
-    int left = 0, right = page_hdr->num_key - 1;
-    return ix_binary_search(left, right, keys, target, file_hdr, col_num);
+    // int left = 0, right = page_hdr->num_key - 1;
+    // return ix_binary_search(left, right, keys, target, file_hdr);
+    int first = 0, middle;
+    int half, len;
+    len = page_hdr->num_key;
+    while(len > 0) {
+        half = len >> 1;
+        middle = first + half;
+        if(ix_compare(get_key(middle), target, file_hdr->col_types_, file_hdr->col_lens_) < 0) {
+            first = middle + 1;
+            len = len - half - 1;
+        }
+        else {
+            len = half;
+        }
+    }
+    return first;
 }
 
 /**
@@ -43,20 +51,29 @@ int IxNodeHandle::upper_bound(const char *target) const {
     // Todo:
     // 查找当前节点中第一个大于target的key，并返回key的位置给上层
     // 提示: 可以采用多种查找方式：顺序遍历、二分查找等；使用ix_compare()函数进行比较
-    return upper_bound(target, -1);
-}
-
-int IxNodeHandle::upper_bound(const char *target, int col_num) const {
-    // Todo:
-    // 查找当前节点中第一个大于target的key，并返回key的位置给上层
-    // 提示: 可以采用多种查找方式：顺序遍历、二分查找等；使用ix_compare()函数进行比较
-    int left = 0, right = page_hdr->num_key - 1;
-    int res = ix_binary_search(left, right, keys, target, file_hdr, col_num, false);
-    assert(res > 0);
-    bool equal = ix_compare(get_key(res), target, file_hdr->col_types_, file_hdr->col_lens_, col_num);
-    if(equal == 0)
-        res += 1;
-    return res;
+    // int left = 0, right = page_hdr->num_key - 1;
+    // int res = ix_binary_search(left, right, keys, target, file_hdr, false);
+    // assert(res > 0);
+    // return res;
+    int first = 0, middle;
+    int half, len;
+    len = page_hdr->num_key - 1;
+    while(len > 0) {
+        half = len >> 1;
+        middle = first + half;
+        if(ix_compare(get_key(middle), target, file_hdr->col_types_, file_hdr->col_lens_) <= 0) {
+            first = middle + 1;
+            len = len - half - 1;
+        }
+        else {
+            len = half;
+        }
+    }
+    assert(first > 0 || (first == 0 && page_hdr->num_key == 0));
+    if(ix_compare(get_key(first), target, file_hdr->col_types_, file_hdr->col_lens_) > 0)
+        return first;
+    else
+        return page_hdr->num_key;
 }
 
 /**
@@ -68,15 +85,6 @@ int IxNodeHandle::upper_bound(const char *target, int col_num) const {
  * @return 目标key是否存在
  */
 bool IxNodeHandle::leaf_lookup(const char *key, Rid **value) {
-    // Todo:
-    // 1. 在叶子节点中获取目标key所在位置
-    // 2. 判断目标key是否存在
-    // 3. 如果存在，获取key对应的Rid，并赋值给传出参数value
-    // 提示：可以调用lower_bound()和get_rid()函数。
-    return leaf_lookup(key, value, -1);
-}
-
-bool IxNodeHandle::leaf_lookup(const char *key, Rid **value, int col_num) {
     // Todo:
     // 1. 在叶子节点中获取目标key所在位置
     // 2. 判断目标key是否存在
@@ -104,15 +112,7 @@ page_id_t IxNodeHandle::internal_lookup(const char *key) {
     // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置
     // 2. 获取该孩子节点（子树）所在页面的编号
     // 3. 返回页面编号
-    return internal_lookup(key, -1);
-}
-
-page_id_t IxNodeHandle::internal_lookup(const char *key, int col_num) {
-    // Todo:
-    // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置
-    // 2. 获取该孩子节点（子树）所在页面的编号
-    // 3. 返回页面编号
-    int key_idx = lower_bound(key, col_num);
+    int key_idx = lower_bound(key);
     return value_at(key_idx);
 }
 
@@ -159,7 +159,7 @@ int IxNodeHandle::insert(const char *key, const Rid &value) {
     // 2. 如果key重复则不插入
     // 3. 如果key不重复则插入键值对
     // 4. 返回完成插入操作之后的键值对数量
-    assert(page_hdr->num_key < file_hdr->btree_order_ - 1);
+    assert(page_hdr->num_key <= file_hdr->btree_order_);
     // 1
     int pos = lower_bound(key);
     // 2,3
@@ -202,7 +202,7 @@ int IxNodeHandle::remove(const char *key) {
     // 3. 返回完成删除操作后的键值对数量
     int pos = lower_bound(key);
     // 2,3
-    if(ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) != 0)
+    if(ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
     {
         erase_pair(pos);
     }
@@ -233,28 +233,18 @@ IxIndexHandle::IxIndexHandle(DiskManager *disk_manager, BufferPoolManager *buffe
  * @note need to Unlatch and unpin the leaf node outside!
  * 注意：用了FindLeafPage之后一定要unlatch叶结点，否则下次latch该结点会堵塞！
  */
-std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, Operation operation,
-                                                            Transaction *transaction, bool find_first) {
-    return find_leaf_page(key, operation, transaction, find_first, -1);
-}
-
 inline std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, Operation operation,
-                                                            Transaction *transaction, bool find_first, int col_num) {
+                                                            Transaction *transaction, bool find_first) {
     // Todo:
     // 1. 获取根节点
     // 2. 从根节点开始不断向下查找目标key
     // 3. 找到包含该key值的叶子结点停止查找，并返回叶子节点
-    root_latch_.lock();
     IxNodeHandle* node = fetch_node(file_hdr_->root_page_);
     while(!node->is_leaf_page())
     {
-        page_id_t child_page = node->internal_lookup(key, col_num);
+        page_id_t child_page = node->internal_lookup(key);
         IxNodeHandle* child = fetch_node(child_page);
         buffer_pool_manager_->unpin_page(node->get_page_id(), false);
-        if(!child->is_root_page())
-        {
-            root_latch_.unlock();
-        }
         delete node;
         node = child;
     }
@@ -281,6 +271,7 @@ bool IxIndexHandle::get_value(const char *key, std::vector<Rid> *result, Transac
     bool res = node->leaf_lookup(key, &rid);
     if(res)
         result->push_back(*rid);
+    buffer_pool_manager_->unpin_page(node->get_page_id(), false);
     return res;
 }
 
@@ -386,6 +377,8 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     if(num_key == file_hdr_->btree_order_) {
         IxNodeHandle* new_node = split(node.get());
         insert_into_parent(node.get(), new_node->get_key(0), new_node, transaction);
+        if(file_hdr_->last_leaf_ == node->get_page_no())
+            file_hdr_->last_leaf_ = new_node->get_page_no();
         buffer_pool_manager_->unpin_page(new_node->get_page_id(), true);
     }
     buffer_pool_manager_->unpin_page(node->get_page_id(), true);
@@ -463,15 +456,18 @@ bool IxIndexHandle::coalesce_or_redistribute(IxNodeHandle *node, Transaction *tr
     {
         neighbor_node = fetch_node(parent->value_at(index - 1));
     }
+    bool res = false;
     if(node->get_size() + neighbor_node->get_size() >= file_hdr_->btree_order_)
     {
         redistribute(neighbor_node, node, parent, index);
     }
     else
     {
-        return coalesce(&neighbor_node, &node, &parent, index, transaction, root_is_latched);
+        res = coalesce(&neighbor_node, &node, &parent, index, transaction, root_is_latched);
     }
-    return false;
+    buffer_pool_manager_->unpin_page(parent->get_page_id(), true);
+    buffer_pool_manager_->unpin_page(neighbor_node->get_page_id(), true);
+    return res;
 }
 
 /**
@@ -620,13 +616,10 @@ Rid IxIndexHandle::get_rid(const Iid &iid) const {
  * 可用*(int *)key转换回去
  */
 Iid IxIndexHandle::lower_bound(const char *key) {
-    return lower_bound(key, -1);
-}
-
-Iid IxIndexHandle::lower_bound(const char *key, int col_num) {
-    std::pair<IxNodeHandle *, bool> leaf = find_leaf_page(key, Operation::FIND, nullptr);
+    std::pair<IxNodeHandle *, bool> leaf = find_leaf_page(key, Operation::FIND, nullptr, false);
     IxNodeHandle *node = leaf.first;
-    int pos = node->lower_bound(key, col_num);
+    int pos = node->lower_bound(key);
+    buffer_pool_manager_->unpin_page(node->get_page_id(), false);  // unpin it!
     return Iid{.page_no = node->get_page_no(), .slot_no = pos};
 }
 
@@ -637,13 +630,10 @@ Iid IxIndexHandle::lower_bound(const char *key, int col_num) {
  * @return Iid
  */
 Iid IxIndexHandle::upper_bound(const char *key) {
-    return upper_bound(key, -1);
-}
-
-Iid IxIndexHandle::upper_bound(const char *key, int col_num) {
     std::pair<IxNodeHandle *, bool> leaf = find_leaf_page(key, Operation::FIND, nullptr);
     IxNodeHandle *node = leaf.first;
-    int pos = node->upper_bound(key, col_num);
+    int pos = node->upper_bound(key);
+    buffer_pool_manager_->unpin_page(node->get_page_id(), false);  // unpin it!
     return Iid{.page_no = node->get_page_no(), .slot_no = pos};
 }
 

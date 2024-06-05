@@ -239,16 +239,34 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
  */
 void SmManager::create_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context) {
     std::vector<ColMeta> cols(col_names.size());
+    std::vector<int> col_idx(col_names.size());
     TabMeta &tab = db_.get_table(tab_name);
     int col_tot_len = 0;
     for (size_t i = 0; i < col_names.size(); ++i) {
         auto col = tab.get_col(col_names[i]);
         cols[i] = *col;
         col_tot_len += col->len;
+        col_idx[i] = col->offset;
     }
     ix_manager_->create_index(tab_name, cols);
     tab.indexes.push_back({tab_name, col_tot_len,(int)cols.size(), cols});
     ihs_.emplace(ix_manager_->get_index_name(tab_name, col_names), std::move(ix_manager_->open_index(tab_name, col_names)));
+    // 将原有的数据插入索引中
+    auto &fh = fhs_[tab_name];
+    auto scan = std::make_unique<RmScan>(fh.get());
+    char* key = new char[tab.get_col_total_len()];
+    auto ih = ihs_.at(ix_manager_->get_index_name(tab_name, cols)).get();
+    while (!scan->is_end()) {
+        auto rec = fh->get_record(scan->rid(), context);
+        int offset = 0;
+        for(size_t i = 0; i < col_names.size(); ++i) {
+            memcpy(key + offset, rec->data + col_idx[i], cols[i].len);
+            offset += cols[i].len;
+        }
+        ih->insert_entry(key, scan->rid(), context->txn_);
+        scan->next();
+    }
+    delete key;
 }
 
 static void col_meta_to_string(const std::vector<ColMeta>& cols, std::vector<std::string>& str) {
@@ -274,6 +292,8 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<std::s
     auto index_meta = tab.get_index_meta(col_names);
     tab.indexes.erase(index_meta);
     ix_manager_->close_index(index_it->second.get());
+    bool res = index_it->second->clear_pages();
+    assert(res);
     ix_manager_->destroy_index(tab_name, col_names);
     ihs_.erase(index_it);
 }

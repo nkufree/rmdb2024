@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
+#include <limits>
 
 class IndexScanExecutor : public AbstractExecutor {
    private:
@@ -34,7 +35,6 @@ class IndexScanExecutor : public AbstractExecutor {
 
     SmManager *sm_manager_;
     int equal_col_num;                          // 等值且在索引中连续的条件的个数
-    std::unique_ptr<IxIndexHandle> ih;
    public:
     IndexScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, std::vector<std::string> index_col_names,
                     Context *context) {
@@ -75,39 +75,40 @@ class IndexScanExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-        ih = std::move(sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_)));
+        // std::cout << "use index" << std::endl;
+        IxIndexHandle* ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_)).get();
         // 遍历检索条件，找出索引条件的下限和上限
         // TODO(zzx)：还可以根据条件进一步限定范围
         char* key = new char[index_meta_.col_tot_len];
         build_equal_key(key);
-        Iid lower = ih->lower_bound(key, equal_col_num);
-        Iid upper = ih->upper_bound(key, equal_col_num);
-        scan_ = std::make_unique<IxScan>(ih.get(), lower, upper, sm_manager_->get_bpm());
+        Iid lower = ih->lower_bound(key);
+        Iid upper = ih->upper_bound(key);
+        scan_ = std::make_unique<IxScan>(ih, lower, upper, sm_manager_->get_bpm());
         // 遍历获取第一个元素
         std::unique_ptr<RmRecord> rec;
         while (!scan_->is_end())
         {
-            rec = fh_->get_record(scan_->rid(), context_);
+            rid_ = scan_->rid();
+            rec = fh_->get_record(rid_, context_);
             if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
                 break;
             scan_->next();
         }
-        rid_ = scan_->rid();
     }
 
     void nextTuple() override {
         std::unique_ptr<RmRecord> rec;
-        scan_->next();
-        while (!scan_->is_end())
+        while (true)
         {
-            rec = fh_->get_record(scan_->rid(), context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
-            {
-                break;
-            }
             scan_->next();
+            if(scan_->is_end())
+                break;
+            rid_ = scan_->rid();
+            rec = fh_->get_record(rid_, context_);
+            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+                break;
         }
-        rid_ = scan_->rid();
+        
     }
 
     std::unique_ptr<RmRecord> Next() override {
@@ -143,6 +144,24 @@ private:
                 break;
             }
             offset += index_meta_.cols[i].len;
+        }
+        int start = offset;
+        for(int i = equal_col_num; i < (int)index_meta_.col_num; i++) {
+            switch (index_meta_.cols[i].type)
+            {
+            case TYPE_INT:
+                *(int*)(key + start) = std::numeric_limits<int>::min();
+                break;
+            case TYPE_FLOAT:
+                *(float*)(key + start) = std::numeric_limits<float>::min();
+                break;
+            case TYPE_STRING:
+                memset(key + start, 0, index_meta_.cols[i].len);
+                break;
+            default:
+                break;
+            }
+            start += index_meta_.cols[i].len;
         }
         return offset;
     }

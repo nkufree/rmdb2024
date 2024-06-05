@@ -29,15 +29,15 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition>& curr_
     std::vector<Condition> equal_conds;
     std::vector<Condition> other_conds;
     for(auto& cond: curr_conds) {
-        if(cond.is_rhs_val && cond.op == OP_EQ && cond.lhs_col.tab_name.compare(tab_name) == 0)
+        if(cond.is_rhs_val && cond.lhs_col.tab_name.compare(tab_name) == 0)
         {
-            index_col_names.push_back(cond.lhs_col.col_name);
+            // index_col_names.push_back(cond.lhs_col.col_name);
             equal_conds.push_back(cond);
         }
         else
             other_conds.push_back(cond);
     }
-    bool res = tab.modify_and_check_index(equal_conds);
+    bool res = tab.modify_and_check_index(equal_conds, index_col_names);
     curr_conds.swap(equal_conds);
     curr_conds.insert(curr_conds.end(), other_conds.begin(), other_conds.end());
     return res;
