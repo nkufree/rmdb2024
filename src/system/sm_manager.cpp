@@ -190,6 +190,7 @@ void SmManager::create_table(const std::string& tab_name, const std::vector<ColD
     for (auto &col_def : col_defs) {
         ColMeta col = {.tab_name = tab_name,
                        .name = col_def.name,
+                       .alias = "",
                        .type = col_def.type,
                        .len = col_def.len,
                        .offset = curr_offset,

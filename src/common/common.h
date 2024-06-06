@@ -86,6 +86,28 @@ struct Value {
         type = new_type;
     }
 
+    static Value col2Value(char *base, const ColMeta& meta) {
+        Value value;
+        switch (meta.type) {
+            case TYPE_INT:
+                value.set_int(*(int *) (base + meta.offset));
+                break;
+            case TYPE_FLOAT:
+                value.set_float(*(float *) (base + meta.offset));
+                break;
+            case TYPE_STRING: {
+                std::string str((char *) (base + meta.offset), meta.len);
+                // 去掉末尾的'\0', 考虑无tailing-zero的情况
+                str.resize(std::min(str.find('\0'), (size_t)meta.len));
+                value.set_str(str);
+                break;
+            }
+            default:
+                throw InternalError("not implemented");
+        }
+        return value;
+    }
+
     bool operator==(const Value &rhs) const {
         if (type != rhs.type) throw IncompatibleTypeError(coltype2str(type), coltype2str(rhs.type));
         switch (type) {
@@ -146,6 +168,12 @@ struct Condition {
             throw InternalError("Unexpected comparison operator");
         }
     }
+
+    [[nodiscard]] bool eval_with_rvalue(const Value &lhs) const {
+        assert(is_rhs_val);
+        return check_condition(lhs, rhs_val);
+    }
+
 };
 
 struct SetClause {

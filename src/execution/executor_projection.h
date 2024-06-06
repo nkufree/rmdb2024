@@ -29,7 +29,7 @@ class ProjectionExecutor : public AbstractExecutor {
         size_t curr_offset = 0;
         auto &prev_cols = prev_->cols();
         for (auto &sel_col : sel_cols) {
-            auto pos = get_col(prev_cols, sel_col);
+            auto pos = get_col(prev_cols, sel_col, true);
             sel_idxs_.push_back(pos - prev_cols.begin());
             auto col = *pos;
             col.offset = curr_offset;
