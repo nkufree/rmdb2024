@@ -108,6 +108,33 @@ struct Value {
         return value;
     }
 
+    void float2int(){
+        assert(type == TYPE_FLOAT);
+        int_val = (int)float_val;
+        type = TYPE_INT;
+    }
+
+    void int2float(){
+        assert(type == TYPE_INT);
+        float_val = (float)int_val;
+        type = TYPE_FLOAT;
+    }
+
+    bool try_cast_to(ColType target_type) {
+        if (type == target_type) {
+            return true;
+        }
+        if (type == TYPE_INT && target_type == TYPE_FLOAT) {
+            int2float();
+            return true;
+        }
+        if (type == TYPE_FLOAT && target_type == TYPE_INT) {
+            float2int();
+            return true;
+        }
+        return false;
+    }
+
     bool operator==(const Value &rhs) const {
         if (type != rhs.type) throw IncompatibleTypeError(coltype2str(type), coltype2str(rhs.type));
         switch (type) {

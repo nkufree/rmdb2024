@@ -62,6 +62,7 @@ private:
     void get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv_conds, std::vector<Condition> &conds);
     void check_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds, bool is_having);
     void check_on_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds);
+    void check_fix_clause(const std::string &tab_name, std::vector<SetClause>& clauses);
     Value convert_sv_value(const std::shared_ptr<ast::Value> &sv_val);
     CompOp convert_sv_comp_op(ast::SvCompOp op);
     bool value_type_match(ColType type1, ColType type2);

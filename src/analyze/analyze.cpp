@@ -117,7 +117,7 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         }
         get_clause(x->conds, query->conds);
         check_clause({x->tab_name}, query->conds, false); 
-
+        check_fix_clause(query->tables.at(0), query->set_clauses);
     } else if (auto x = std::dynamic_pointer_cast<ast::DeleteStmt>(parse)) {
         //处理where条件
         get_clause(x->conds, query->conds);
@@ -269,6 +269,10 @@ void Analyze::check_clause(const std::vector<std::string> &tab_names, std::vecto
             } else {
                 rhs_type = sm_manager_->db_.get_table(cond.rhs_col.tab_name).get_col(cond.rhs_col.col_name)->type;
             }
+            if(!value_type_match(lhs_type, rhs_type)){
+                throw IncompatibleTypeError(coltype2str(lhs_type), coltype2str(rhs_type));
+            }
+
         } else {
             TabMeta &lhs_tab = sm_manager_->db_.get_table(cond.lhs_col.tab_name);
             auto lhs_col = lhs_tab.get_col(cond.lhs_col.col_name);
@@ -324,4 +328,21 @@ bool Analyze::value_type_match(ColType type1, ColType type2) {
         return true;
     }
     return false;
+}
+
+void Analyze::check_fix_clause(const std::string &tab_name, std::vector<SetClause>& clauses){
+    TabMeta table = sm_manager_->db_.get_table(tab_name);
+    for(auto& clause: clauses){
+        table.is_col(clause.lhs.col_name);  
+        ColType lhs_type = table.get_col(clause.lhs.col_name)->type;
+        ColType rhs_type = clause.rhs.type;
+        if(!value_type_match(lhs_type, rhs_type)){   
+            throw IncompatibleTypeError(coltype2str(lhs_type), coltype2str(rhs_type));
+        }
+        if(lhs_type == TYPE_INT && rhs_type == TYPE_FLOAT){
+            clause.rhs.float2int();
+        }else if(lhs_type == TYPE_FLOAT && rhs_type == TYPE_INT){
+            clause.rhs.int2float();
+        }
+    }
 }
