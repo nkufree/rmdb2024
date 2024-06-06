@@ -163,13 +163,12 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     // print header into file
     std::fstream outfile;
     outfile.open("output.txt", std::ios::out | std::ios::app);
-    //outfile << "|";
-    //for(int i = 0; i < (int)captions.size(); ++i) {
-        //outfile << " " << captions[i] << " |";
-    //}
-    //outfile << "\n";
-    bool printed_header = false;
-
+    outfile << "|";
+    for(int i = 0; i < (int)captions.size(); ++i) {
+        outfile << " " << captions[i] << " |";
+    }
+    outfile << "\n";
+    
     // Print records
     size_t num_rec = 0;
     // 执行query_plan
@@ -191,16 +190,6 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
             }
 
             columns.push_back(col_str);
-        }
-        
-        if (!printed_header) {
-            // print header into file
-            printed_header = true;
-            outfile << "|";
-            for(int i = 0; i < captions.size(); ++i) {
-                outfile << " " << captions[i] << " |";
-            }
-            outfile << "\n";
         }
         // print record into buffer
         rec_printer.print_record(columns, context);
