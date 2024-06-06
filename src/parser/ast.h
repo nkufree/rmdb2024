@@ -36,6 +36,14 @@ enum SetKnobType {
     EnableNestLoop, EnableSortMerge
 };
 
+enum AggregationType {
+    NO_AGGR,
+    AGGR_TYPE_COUNT,
+    AGGR_TYPE_MAX,
+    AGGR_TYPE_MIN,
+    AGGR_TYPE_SUM
+};
+
 // Base class for tree nodes
 struct TreeNode {
     virtual ~TreeNode() = default;  // enable polymorphism
@@ -147,6 +155,7 @@ struct Col : public Expr {
     std::string tab_name;
     std::string col_name;
     std::string alias; // 默认情况下为空
+    AggregationType aggr_type = NO_AGGR;
 
     Col(std::string tab_name_, std::string col_name_) :
             tab_name(std::move(tab_name_)), col_name(std::move(col_name_)) {}
@@ -178,6 +187,17 @@ struct OrderBy : public TreeNode
     OrderByDir orderby_dir;
     OrderBy( std::shared_ptr<Col> cols_, OrderByDir orderby_dir_) :
        cols(std::move(cols_)), orderby_dir(std::move(orderby_dir_)) {}
+};
+
+struct GroupBy : public TreeNode
+{
+    std::vector<std::shared_ptr<Col>> cols;
+    std::vector<std::shared_ptr<BinaryExpr>> conds;
+
+    GroupBy(std::vector<std::shared_ptr<Col>> cols_) :
+       cols(std::move(cols_)) {}
+    GroupBy(std::vector<std::shared_ptr<Col>> cols_, std::vector<std::shared_ptr<BinaryExpr>> conds_) :
+       cols(std::move(cols_)), conds(std::move(conds_)) {}
 };
 
 struct InsertStmt : public TreeNode {
@@ -225,21 +245,20 @@ struct SelectStmt : public TreeNode {
     std::vector<std::shared_ptr<BinaryExpr>> conds;
     std::vector<std::shared_ptr<JoinExpr>> jointree;
 
-    
     bool has_sort;
     std::shared_ptr<OrderBy> order;
-
+    std::shared_ptr<GroupBy> group;
 
     SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
                std::vector<std::string> tabs_,
                std::vector<std::shared_ptr<BinaryExpr>> on_conds_,
                std::vector<std::shared_ptr<BinaryExpr>> conds_,
-               std::shared_ptr<OrderBy> order_) :
-            cols(std::move(cols_)), tabs(std::move(tabs_)), on_conds(std::move(on_conds_)), conds(std::move(conds_)), 
-            order(std::move(order_)) {
-                has_sort = (bool)order;
-            }
+               std::shared_ptr<OrderBy> order_,
+               std::shared_ptr<GroupBy> group_) :
+            cols(std::move(cols_)), tabs(std::move(tabs_)),on_conds(std::move(on_conds_)), conds(std::move(conds_)), 
+            group(std::move(group_)), order(std::move(order_)) {has_sort = (bool)order;}
 };
+
 
 // set enable_nestloop
 struct SetStmt : public TreeNode {
@@ -257,6 +276,8 @@ struct SemValue {
     std::string sv_str;
     bool sv_bool;
     OrderByDir sv_orderby_dir;
+    AggregationType sv_aggr_type;
+
     std::vector<std::string> sv_strs;
 
     std::shared_ptr<TreeNode> sv_node;
@@ -284,6 +305,8 @@ struct SemValue {
     std::vector<std::shared_ptr<BinaryExpr>> sv_conds;
 
     std::shared_ptr<OrderBy> sv_orderby;
+
+    std::shared_ptr<GroupBy> sv_groupby;
 
     SetKnobType sv_setKnobType;
 };
