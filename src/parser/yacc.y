@@ -21,8 +21,8 @@ using namespace ast;
 %define parse.error verbose
 
 // keywords
-%token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY
-WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ORDER_BY ENABLE_NESTLOOP ENABLE_SORTMERGE ON
+%token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER GROUP BY
+WHERE UPDATE SET SELECT AS INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ORDER_BY ENABLE_NESTLOOP ENABLE_SORTMERGE ON
 // non-keywords
 %token LEQ NEQ GEQ T_EOF
 
@@ -42,7 +42,7 @@ WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_CO
 %type <sv_val> value
 %type <sv_vals> valueList oneValue
 %type <sv_vals_list> valuesList
-%type <sv_str> tbName colName
+%type <sv_str> tbName colName alias
 %type <sv_strs> tableList colNameList
 %type <sv_col> col
 %type <sv_cols> colList selector
@@ -305,8 +305,18 @@ colList:
     {
         $$ = std::vector<std::shared_ptr<Col>>{$1};
     }
+    |   col AS alias
+    {
+        $1->alias = $3;
+        $$ = std::vector<std::shared_ptr<Col>>{$1};
+    }
     |   colList ',' col
     {
+        $$.push_back($3);
+    }
+    |   colList ',' col AS alias
+    {
+        $3->alias = $5;
         $$.push_back($3);
     }
     ;
@@ -419,4 +429,6 @@ set_knob_type:
 tbName: IDENTIFIER;
 
 colName: IDENTIFIER;
+
+alias: IDENTIFIER;
 %%
