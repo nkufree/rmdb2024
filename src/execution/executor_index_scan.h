@@ -17,6 +17,17 @@ See the Mulan PSL v2 for more details. */
 #include "system/sm.h"
 #include <limits>
 
+struct ColRange {
+    bool has_lower_bound;
+    Value lower_val;
+    bool has_upper_bound;
+    Value upper_val;
+    ColRange(){
+        has_lower_bound = false;
+        has_upper_bound = false;
+    }
+};
+
 class IndexScanExecutor : public AbstractExecutor {
    private:
     std::string tab_name_;                      // 表名称
@@ -35,6 +46,7 @@ class IndexScanExecutor : public AbstractExecutor {
 
     SmManager *sm_manager_;
     int equal_col_num;                          // 等值且在索引中连续的条件的个数
+    std::vector<ColRange> other_col_range;          // 不在等于范围内的条件的范围
    public:
     IndexScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, std::vector<std::string> index_col_names,
                     Context *context) {
@@ -52,7 +64,13 @@ class IndexScanExecutor : public AbstractExecutor {
         std::map<CompOp, CompOp> swap_op = {
             {OP_EQ, OP_EQ}, {OP_NE, OP_NE}, {OP_LT, OP_GT}, {OP_GT, OP_LT}, {OP_LE, OP_GE}, {OP_GE, OP_LE},
         };
+        // 构建列名到索引下标的映射
+        std::unordered_map<std::string, int> col_name_to_index;
+        for (int i = 0; i < (int)index_meta_.col_num; i++) {
+            col_name_to_index[index_meta_.cols[i].name] = i;
+        }
         fed_conds_.clear();
+        other_col_range.resize(index_meta_.col_num);
         equal_col_num = 0;
         bool still_equal = true;
         for (auto &cond : conds_) {
@@ -69,6 +87,24 @@ class IndexScanExecutor : public AbstractExecutor {
             else {
                 still_equal = false;
                 fed_conds_.push_back(cond);
+                if(!cond.is_rhs_val) 
+                    continue;
+                ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
+                switch (cond.op)
+                {
+                case OP_GE:
+                case OP_GT:
+                    other_col.has_lower_bound = true;
+                    other_col.lower_val = cond.rhs_val;
+                    break;
+                case OP_LE:
+                case OP_LT:
+                    other_col.has_upper_bound = true;
+                    other_col.upper_val = cond.rhs_val;
+                    break;
+                default:
+                    break;
+                }
             }
         }
         // fed_conds_ = conds_;
@@ -80,9 +116,15 @@ class IndexScanExecutor : public AbstractExecutor {
         // 遍历检索条件，找出索引条件的下限和上限
         // TODO(zzx)：还可以根据条件进一步限定范围
         char* key = new char[index_meta_.col_tot_len];
-        build_equal_key(key);
+        int offset = build_equal_key(key);
+        build_lower_key(key, offset);
+        build_range_key(key, offset, true);
         Iid lower = ih->lower_bound(key);
+        build_upper_key(key, offset);
+        build_range_key(key, offset, false);
         Iid upper = ih->upper_bound(key);
+        // std::cout << "lower: " << lower.page_no << " " << lower.slot_no << std::endl;
+        // std::cout << "upper: " << upper.page_no << " " << upper.slot_no << std::endl;
         scan_ = std::make_unique<IxScan>(ih, lower, upper, sm_manager_->get_bpm());
         // 遍历获取第一个元素
         std::unique_ptr<RmRecord> rec;
@@ -166,22 +208,67 @@ private:
         return offset;
     }
 
-    void build_range_key(char* key, int start, bool is_lower_bound) {
-        // TODO(zzx): 待完善
-        int offset = start;
+    void build_lower_key(char* key, int offset) {
         for(int i = equal_col_num; i < (int)index_meta_.col_num; i++) {
-            conds_[i].rhs_val.value_cast(index_meta_.cols[i].type);
             switch (index_meta_.cols[i].type)
             {
             case TYPE_INT:
-                memcpy(key + offset, (void*)&conds_[i].rhs_val.int_val, sizeof(int));
+                *(int*)(key + offset) = std::numeric_limits<int>::min();
                 break;
             case TYPE_FLOAT:
-                memcpy(key + offset, (void*)&conds_[i].rhs_val.float_val, sizeof(float));
+                *(float*)(key + offset) = std::numeric_limits<float>::min();
                 break;
             case TYPE_STRING:
                 memset(key + offset, 0, index_meta_.cols[i].len);
-                memcpy(key + offset, conds_[i].rhs_val.str_val.c_str(), conds_[i].rhs_val.str_val.size());
+                break;
+            default:
+                break;
+            }
+            offset += index_meta_.cols[i].len;
+        }
+    }
+
+    void build_upper_key(char* key, int offset) {
+        for(int i = equal_col_num; i < (int)index_meta_.col_num; i++) {
+            switch (index_meta_.cols[i].type)
+            {
+            case TYPE_INT:
+                *(int*)(key + offset) = std::numeric_limits<int>::max();
+                break;
+            case TYPE_FLOAT:
+                *(float*)(key + offset) = std::numeric_limits<float>::max();
+                break;
+            case TYPE_STRING:
+                memset(key + offset, 0xFF, index_meta_.cols[i].len);
+                break;
+            default:
+                break;
+            }
+            offset += index_meta_.cols[i].len;
+        }
+    }
+
+    void build_range_key(char* key, int start, bool is_lower_bound) {
+        int offset = start;
+        for(int i = equal_col_num; i < (int)index_meta_.col_num; i++) {
+            bool need_fill = is_lower_bound ? other_col_range[i].has_lower_bound : other_col_range[i].has_upper_bound;
+            Value& val = is_lower_bound ? other_col_range[i].lower_val : other_col_range[i].upper_val;
+            if(!need_fill) {
+                offset += index_meta_.cols[i].len;
+                continue;
+            }
+            val.value_cast(index_meta_.cols[i].type);
+            switch (index_meta_.cols[i].type)
+            {
+            case TYPE_INT:
+                memcpy(key + offset, (void*)&val.int_val, sizeof(int));
+                break;
+            case TYPE_FLOAT:
+                memcpy(key + offset, (void*)&val.float_val, sizeof(float));
+                break;
+            case TYPE_STRING:
+                memset(key + offset, 0, index_meta_.cols[i].len);
+                memcpy(key + offset, val.str_val.c_str(), val.str_val.size());
                 break;
             default:
                 break;

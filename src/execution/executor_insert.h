@@ -67,6 +67,7 @@ class InsertExecutor : public AbstractExecutor {
                     offset += index.cols[i].len;
                 }
                 ih->insert_entry(key, rid_, context_->txn_);
+                // ih->print_tree();
             }
         }
         delete[] key;
