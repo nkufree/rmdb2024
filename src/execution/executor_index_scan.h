@@ -72,6 +72,7 @@ class IndexScanExecutor : public AbstractExecutor {
         fed_conds_.clear();
         other_col_range.resize(index_meta_.col_num);
         equal_col_num = 0;
+        bool still_equal = true;
         for (size_t i = 0; i < conds_.size(); i++) {
             auto &cond = conds_[i];
             if (cond.lhs_col.tab_name != tab_name_) {
@@ -81,10 +82,11 @@ class IndexScanExecutor : public AbstractExecutor {
                 std::swap(cond.lhs_col, cond.rhs_col);
                 cond.op = swap_op.at(cond.op);
             }
-            if(cond.op == OP_EQ && conds_[i].lhs_col.col_name == index_col_names_[equal_col_num].c_str()) {
+            if(cond.op == OP_EQ && still_equal && (int)i < index_meta_.col_num && cond.is_rhs_val && conds_[i].lhs_col.col_name == index_col_names_[equal_col_num].c_str()) {
                 equal_col_num++;
             }
             else {
+                still_equal = false;
                 fed_conds_.push_back(cond);
                 if(!cond.is_rhs_val) 
                     continue;
