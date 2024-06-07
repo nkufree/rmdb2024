@@ -76,7 +76,6 @@ class IndexScanExecutor : public AbstractExecutor {
         fed_conds_.clear();
         other_col_range.resize(index_meta_.col_num);
         equal_col_num = 0;
-        try{
         // 从条件中构建索引各个字段的范围
         for (size_t i = 0; i < conds_.size(); i++) {
             auto &cond = conds_[i];
@@ -130,9 +129,6 @@ class IndexScanExecutor : public AbstractExecutor {
             if(cond_used[i] == 0) {
                 fed_conds_.push_back(conds_[i]);
             }
-        }
-        } catch (const std::exception& e) {
-            std::cerr << e.what() << '\n';
         }
     }
 
