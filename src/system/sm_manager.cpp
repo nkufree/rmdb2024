@@ -229,6 +229,7 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
         drop_index(tab_name, index.cols, context);
     }
     // 删除表
+    fh->clear_pages();
     rm_manager_->close_file(fh.get());  // 关闭文件
     rm_manager_->destroy_file(tab_name);
     db_.tabs_.erase(tab_name);
@@ -271,7 +272,7 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
         ih->insert_entry(key, scan->rid(), context->txn_);
         scan->next();
     }
-    std::cout << "create index, btree order: " << ih->get_btree_order() << std::endl;
+    // std::cout << "create index, btree order: " << ih->get_btree_order() << std::endl;
     delete key;
 }
 

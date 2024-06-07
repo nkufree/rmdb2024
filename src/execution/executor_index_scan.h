@@ -72,8 +72,8 @@ class IndexScanExecutor : public AbstractExecutor {
         fed_conds_.clear();
         other_col_range.resize(index_meta_.col_num);
         equal_col_num = 0;
-        bool still_equal = true;
-        for (auto &cond : conds_) {
+        for (size_t i = 0; i < conds_.size(); i++) {
+            auto &cond = conds_[i];
             if (cond.lhs_col.tab_name != tab_name_) {
                 // lhs is on other table, now rhs must be on this table
                 assert(!cond.is_rhs_val && cond.rhs_col.tab_name == tab_name_);
@@ -81,11 +81,10 @@ class IndexScanExecutor : public AbstractExecutor {
                 std::swap(cond.lhs_col, cond.rhs_col);
                 cond.op = swap_op.at(cond.op);
             }
-            if(cond.op == OP_EQ && still_equal) {
+            if(cond.op == OP_EQ && conds_[i].lhs_col.col_name == index_col_names_[equal_col_num].c_str()) {
                 equal_col_num++;
             }
             else {
-                still_equal = false;
                 fed_conds_.push_back(cond);
                 if(!cond.is_rhs_val) 
                     continue;
@@ -114,7 +113,6 @@ class IndexScanExecutor : public AbstractExecutor {
         // std::cout << "use index" << std::endl;
         IxIndexHandle* ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_)).get();
         // 遍历检索条件，找出索引条件的下限和上限
-        // TODO(zzx)：还可以根据条件进一步限定范围
         char* key = new char[index_meta_.col_tot_len];
         int offset = build_equal_key(key);
         build_lower_key(key, offset);
@@ -123,6 +121,8 @@ class IndexScanExecutor : public AbstractExecutor {
         build_upper_key(key, offset);
         build_range_key(key, offset, false);
         Iid upper = ih->upper_bound(key);
+        delete[] key;
+        // ih->print_tree();
         // std::cout << "lower: " << lower.page_no << " " << lower.slot_no << std::endl;
         // std::cout << "upper: " << upper.page_no << " " << upper.slot_no << std::endl;
         scan_ = std::make_unique<IxScan>(ih, lower, upper, sm_manager_->get_bpm());
