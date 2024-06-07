@@ -22,9 +22,13 @@ struct ColRange {
     Value lower_val;
     bool has_upper_bound;
     Value upper_val;
+    bool has_equal_bound;
+    Value equal_val;
+    int equal_index;
     ColRange(){
         has_lower_bound = false;
         has_upper_bound = false;
+        has_equal_bound = false;
     }
 };
 
@@ -72,7 +76,7 @@ class IndexScanExecutor : public AbstractExecutor {
         fed_conds_.clear();
         other_col_range.resize(index_meta_.col_num);
         equal_col_num = 0;
-        bool still_equal = true;
+        // 从条件中构建索引各个字段的范围
         for (size_t i = 0; i < conds_.size(); i++) {
             auto &cond = conds_[i];
             if (cond.lhs_col.tab_name != tab_name_) {
@@ -82,35 +86,51 @@ class IndexScanExecutor : public AbstractExecutor {
                 std::swap(cond.lhs_col, cond.rhs_col);
                 cond.op = swap_op.at(cond.op);
             }
-            // if(cond.op == OP_EQ && still_equal && (int)i < index_meta_.col_num && cond.is_rhs_val && conds_[i].lhs_col.col_name == index_col_names_[equal_col_num].c_str()) {
-            //     equal_col_num++;
-            // }
-            // else {
-            //     still_equal = false;
+            if(!cond.is_rhs_val || col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end()) 
+            {
                 fed_conds_.push_back(cond);
-                if(!cond.is_rhs_val) 
-                    continue;
-                if(col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end())
-                    continue;
-                ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
-                switch (cond.op)
-                {
-                case OP_GE:
-                case OP_GT:
-                    other_col.has_lower_bound = true;
-                    other_col.lower_val = cond.rhs_val;
-                    break;
-                case OP_LE:
-                case OP_LT:
-                    other_col.has_upper_bound = true;
-                    other_col.upper_val = cond.rhs_val;
-                    break;
-                default:
-                    break;
-                }
-            // }
+                continue;
+            }
+            ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
+            switch (cond.op)
+            {
+            case OP_GT:
+            case OP_GE:
+                other_col.has_lower_bound = true;
+                other_col.lower_val = cond.rhs_val;
+                break;
+            case OP_LE:
+            case OP_LT:
+                other_col.has_upper_bound = true;
+                other_col.upper_val = cond.rhs_val;
+                break;
+            case OP_EQ:
+                other_col.has_equal_bound = true;
+                other_col.equal_val = cond.rhs_val;
+                other_col.equal_index = i;
+                break;
+            default:
+                break;
+            }
         }
-        // fed_conds_ = conds_;
+        std::vector<int> cond_used(conds_.size(), 0);
+        // 遍历索引各个字段，查找连续的等值条件
+        // TODO: (zzx) 这里还可以继续减少条件，比如部分大于和小于等于的条件也可以删去
+        for (size_t i = 0; i < (size_t)index_meta_.col_num; i++) {
+            if(other_col_range[i].has_equal_bound) {
+                equal_col_num++;
+                cond_used[other_col_range[i].equal_index] = 1;
+            }
+            else {
+                break;
+            }
+        }
+        // 将不连续的条件放入fed_conds_
+        for (size_t i = 0; i < conds_.size(); i++) {
+            if(cond_used[i] == 0) {
+                fed_conds_.push_back(conds_[i]);
+            }
+        }
     }
 
     void beginTuple() override {
@@ -173,7 +193,8 @@ private:
     int build_equal_key(char* key) {
         int offset = 0;
         for(int i = 0; i < equal_col_num; i++) {
-            conds_[i].rhs_val.value_cast(index_meta_.cols[i].type);
+            Value& val = other_col_range[i].equal_val;
+            val.value_cast(index_meta_.cols[i].type);
             switch (index_meta_.cols[i].type)
             {
             case TYPE_INT:
@@ -258,8 +279,7 @@ private:
             bool need_fill = is_lower_bound ? other_col_range[i].has_lower_bound : other_col_range[i].has_upper_bound;
             Value& val = is_lower_bound ? other_col_range[i].lower_val : other_col_range[i].upper_val;
             if(!need_fill) {
-                offset += index_meta_.cols[i].len;
-                continue;
+                break;
             }
             val.value_cast(index_meta_.cols[i].type);
             switch (index_meta_.cols[i].type)
