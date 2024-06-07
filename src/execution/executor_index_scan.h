@@ -88,7 +88,6 @@ class IndexScanExecutor : public AbstractExecutor {
             }
             if(!cond.is_rhs_val || col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end()) 
             {
-                fed_conds_.push_back(cond);
                 continue;
             }
             ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
