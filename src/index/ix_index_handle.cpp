@@ -69,7 +69,7 @@ int IxNodeHandle::upper_bound(const char *target) const {
             len = half;
         }
     }
-    assert(first > 0 || (first == 0 && page_hdr->num_key == 0));
+    assert(first > 0 || (first == 0 && page_hdr->num_key == 0) || page_hdr->parent == INVALID_PAGE_ID);
     if(ix_compare(get_key(first), target, file_hdr->col_types_, file_hdr->col_lens_) > 0)
         return first;
     else
