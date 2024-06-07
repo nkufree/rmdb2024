@@ -678,13 +678,12 @@ Iid IxIndexHandle::lower_bound(const char *key) {
     std::pair<IxNodeHandle *, bool> leaf = find_leaf_page(key, Operation::FIND, nullptr, false);
     IxNodeHandle *node = leaf.first;
     int pos = node->lower_bound(key);
-    if(pos == node->get_size())
+    if(pos == node->get_size() && node->get_page_no() != file_hdr_->last_leaf_)
     {
         pos = 0;
         IxNodeHandle* new_node = fetch_node(node->get_next_leaf());
         buffer_pool_manager_->unpin_page(node->get_page_id(), false);  // unpin it!
         node = new_node;
-
     }
     Iid iid = {.page_no = node->get_page_no(), .slot_no = pos};
     buffer_pool_manager_->unpin_page(node->get_page_id(), false);  // unpin it!

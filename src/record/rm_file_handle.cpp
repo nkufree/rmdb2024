@@ -23,7 +23,9 @@ std::unique_ptr<RmRecord> RmFileHandle::get_record(const Rid& rid, Context* cont
 
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     char* slot = page_handle.get_slot(rid.slot_no);
-    return std::make_unique<RmRecord>(file_hdr_.record_size, slot);
+    std::unique_ptr<RmRecord> record = std::make_unique<RmRecord>(file_hdr_.record_size, slot);
+    buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), false);
+    return record;
 }
 
 /**
