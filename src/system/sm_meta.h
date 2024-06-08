@@ -152,8 +152,9 @@ struct TabMeta {
         return total_len;
     }
 
-    // 匹配索引，查找最长匹配的索引，返回顺序与索引一致的条件序列
+    // 匹配索引，查找最长匹配的索引
     bool modify_and_check_index(std::vector<Condition>& conds, std::vector<std::string>& index_col_names) {
+        return false;
         std::unordered_map<std::string, std::vector<int>> col_idx_map;
         for(size_t i = 0; i < conds.size(); i++) {
             if(col_idx_map.find(conds[i].lhs_col.col_name) == col_idx_map.end())
@@ -161,7 +162,7 @@ struct TabMeta {
             else
                 col_idx_map[conds[i].lhs_col.col_name].push_back(i);
         }
-        std::vector<Condition> new_conds;
+        // std::vector<Condition> new_conds;
         int max_match_len = 0;
         int max_match_idx = -1;
         for(size_t i = 0; i < indexes.size(); i++) {
@@ -182,24 +183,27 @@ struct TabMeta {
         }
         if(max_match_idx == -1) return false;
         IndexMeta& index_meta = indexes[max_match_idx];
-        bool col_end = false;
         for(ColMeta& col: index_meta.cols) {
             index_col_names.push_back(col.name);
-            auto it = col_idx_map.find(col.name);
-            if(it == col_idx_map.end() || col_end) {
-                col_end = true;
-                continue;
-            }
-            for(int idx: it->second) {
-                new_conds.push_back(conds[idx]);
-            }
-            col_idx_map.erase(it);
         }
-        for(auto p : col_idx_map) {
-            for(int idx: p.second)
-                new_conds.push_back(conds[idx]);
-        }
-        conds.swap(new_conds);
+        // bool col_end = false;
+        // for(ColMeta& col: index_meta.cols) {
+        //     index_col_names.push_back(col.name);
+        //     auto it = col_idx_map.find(col.name);
+        //     if(it == col_idx_map.end() || col_end) {
+        //         col_end = true;
+        //         continue;
+        //     }
+        //     for(int idx: it->second) {
+        //         new_conds.push_back(conds[idx]);
+        //     }
+        //     col_idx_map.erase(it);
+        // }
+        // for(auto p : col_idx_map) {
+        //     for(int idx: p.second)
+        //         new_conds.push_back(conds[idx]);
+        // }
+        // conds.swap(new_conds);
         return true;
     }
 
