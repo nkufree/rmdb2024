@@ -86,51 +86,50 @@ class IndexScanExecutor : public AbstractExecutor {
                 std::swap(cond.lhs_col, cond.rhs_col);
                 cond.op = swap_op.at(cond.op);
             }
-            // if(!cond.is_rhs_val || col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end()) 
-            // {
-            //     continue;
-            // }
-            // ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
-            // switch (cond.op)
-            // {
-            // case OP_GT:
-            // case OP_GE:
-            //     other_col.has_lower_bound = true;
-            //     other_col.lower_val = cond.rhs_val;
-            //     break;
-            // case OP_LE:
-            // case OP_LT:
-            //     other_col.has_upper_bound = true;
-            //     other_col.upper_val = cond.rhs_val;
-            //     break;
-            // case OP_EQ:
-            //     other_col.has_equal_bound = true;
-            //     other_col.equal_val = cond.rhs_val;
-            //     other_col.equal_index = i;
-            //     break;
-            // default:
-            //     break;
-            // }
+            if(!cond.is_rhs_val || col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end()) 
+            {
+                continue;
+            }
+            ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
+            switch (cond.op)
+            {
+            case OP_GT:
+            case OP_GE:
+                other_col.has_lower_bound = true;
+                other_col.lower_val = cond.rhs_val;
+                break;
+            case OP_LE:
+            case OP_LT:
+                other_col.has_upper_bound = true;
+                other_col.upper_val = cond.rhs_val;
+                break;
+            case OP_EQ:
+                other_col.has_equal_bound = true;
+                other_col.equal_val = cond.rhs_val;
+                other_col.equal_index = i;
+                break;
+            default:
+                break;
+            }
         }
-        // std::vector<int> cond_used(conds_.size(), 0);
-        // // 遍历索引各个字段，查找连续的等值条件
-        // // TODO: (zzx) 这里还可以继续减少条件，比如部分大于和小于等于的条件也可以删去
-        // for (size_t i = 0; i < (size_t)index_meta_.col_num; i++) {
-        //     if(other_col_range[i].has_equal_bound) {
-        //         equal_col_num++;
-        //         cond_used[other_col_range[i].equal_index] = 1;
-        //     }
-        //     else {
-        //         break;
-        //     }
-        // }
-        // // 将不连续的条件放入fed_conds_
-        // for (size_t i = 0; i < conds_.size(); i++) {
-        //     if(cond_used[i] == 0) {
-        //         fed_conds_.push_back(conds_[i]);
-        //     }
-        // }
-        fed_conds_ = conds_;
+        std::vector<int> cond_used(conds_.size(), 0);
+        // 遍历索引各个字段，查找连续的等值条件
+        // TODO: (zzx) 这里还可以继续减少条件，比如部分大于和小于等于的条件也可以删去
+        for (size_t i = 0; i < (size_t)index_meta_.col_num; i++) {
+            if(other_col_range[i].has_equal_bound) {
+                equal_col_num++;
+                cond_used[other_col_range[i].equal_index] = 1;
+            }
+            else {
+                break;
+            }
+        }
+        // 将不连续的条件放入fed_conds_
+        for (size_t i = 0; i < conds_.size(); i++) {
+            if(cond_used[i] == 0) {
+                fed_conds_.push_back(conds_[i]);
+            }
+        }
     }
 
     void beginTuple() override {
@@ -140,10 +139,10 @@ class IndexScanExecutor : public AbstractExecutor {
         char* key = new char[index_meta_.col_tot_len];
         int offset = build_equal_key(key);
         build_lower_key(key, offset);
-        build_range_key(key, offset, true);
+        // build_range_key(key, offset, true);
         Iid lower = ih->lower_bound(key);
         build_upper_key(key, offset);
-        build_range_key(key, offset, false);
+        // build_range_key(key, offset, false);
         Iid upper = ih->upper_bound(key);
         delete[] key;
         // ih->print_tree();
@@ -198,37 +197,19 @@ private:
             switch (index_meta_.cols[i].type)
             {
             case TYPE_INT:
-                memcpy(key + offset, (void*)&conds_[i].rhs_val.int_val, sizeof(int));
+                memcpy(key + offset, (void*)&val.int_val, sizeof(int));
                 break;
             case TYPE_FLOAT:
-                memcpy(key + offset, (void*)&conds_[i].rhs_val.float_val, sizeof(float));
+                memcpy(key + offset, (void*)&val.float_val, sizeof(float));
                 break;
             case TYPE_STRING:
                 memset(key + offset, 0, index_meta_.cols[i].len);
-                memcpy(key + offset, conds_[i].rhs_val.str_val.c_str(), conds_[i].rhs_val.str_val.size());
+                memcpy(key + offset, val.str_val.c_str(), val.str_val.size());
                 break;
             default:
                 break;
             }
             offset += index_meta_.cols[i].len;
-        }
-        int start = offset;
-        for(int i = equal_col_num; i < (int)index_meta_.col_num; i++) {
-            switch (index_meta_.cols[i].type)
-            {
-            case TYPE_INT:
-                *(int*)(key + start) = std::numeric_limits<int>::min();
-                break;
-            case TYPE_FLOAT:
-                *(float*)(key + start) = std::numeric_limits<float>::min();
-                break;
-            case TYPE_STRING:
-                memset(key + start, 0, index_meta_.cols[i].len);
-                break;
-            default:
-                break;
-            }
-            start += index_meta_.cols[i].len;
         }
         return offset;
     }
