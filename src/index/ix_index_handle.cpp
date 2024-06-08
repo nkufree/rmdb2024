@@ -392,7 +392,7 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
  * @param transaction 事务指针
  * @return page_id_t 插入到的叶结点的page_no
  */
-page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction) {
+page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success) {
     // Todo:
     // 1. 查找key值应该插入到哪个叶子节点
     // 2. 在该叶子节点中插入键值对
@@ -401,7 +401,14 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     std::scoped_lock<std::mutex> lock(root_latch_);
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::INSERT, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
+    int prev_num_key = node->get_size();
     int num_key = node->insert(key, value);
+    if(num_key == prev_num_key)
+    {
+        buffer_pool_manager_->unpin_page(node->get_page_id(), true);
+        *success = false;
+        return node->get_page_no();
+    }
     if(node->lower_bound(key) == 0)
         maintain_parent(node.get());
     if(num_key == file_hdr_->btree_order_) {
@@ -412,6 +419,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
         buffer_pool_manager_->unpin_page(new_node->get_page_id(), true);
     }
     buffer_pool_manager_->unpin_page(node->get_page_id(), true);
+    *success = true;
     return node->get_page_no();
 }
 

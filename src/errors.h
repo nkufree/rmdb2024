@@ -82,6 +82,11 @@ class IndexEntryNotFoundError : public RMDBError {
     IndexEntryNotFoundError() : RMDBError("Index entry not found") {}
 };
 
+class IndexEntryExistError : public RMDBError {
+   public:
+    IndexEntryExistError() : RMDBError("Index entry exits") {}
+};
+
 // SM errors
 class DatabaseNotFoundError : public RMDBError {
    public:

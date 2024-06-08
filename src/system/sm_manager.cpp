@@ -269,7 +269,11 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
             memcpy(key + offset, rec->data + col_idx[i], cols[i].len);
             offset += cols[i].len;
         }
-        ih->insert_entry(key, scan->rid(), context->txn_);
+        bool success;
+        ih->insert_entry(key, scan->rid(), context->txn_, &success);
+        if(!success) {
+            fh->delete_record(scan->rid(), context);
+        }
         scan->next();
     }
     // std::cout << "create index, btree order: " << ih->get_btree_order() << std::endl;

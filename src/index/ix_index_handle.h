@@ -223,7 +223,7 @@ class IxIndexHandle {
                                                  bool find_first = false);
 
     // for insert
-    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success);
 
     IxNodeHandle *split(IxNodeHandle *node);
 

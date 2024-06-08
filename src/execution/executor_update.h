@@ -89,7 +89,11 @@ class UpdateExecutor : public AbstractExecutor {
                     memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
                     offset += index.cols[i].len;
                 }
-                ih->insert_entry(key, rid, context_->txn_);
+                bool success;
+                ih->insert_entry(key, rid, context_->txn_, &success);
+                if(!success) {
+                    fh_->delete_record(rid, context_);
+                }
             }
         }
         delete[] key;
