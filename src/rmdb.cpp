@@ -166,21 +166,6 @@ void *client_handler(void *sock_fd) {
                     outfile << "failure\n";
                     outfile.close();
                 }
-                catch (std::exception &e) {
-                    // 遇到异常，需要打印failure到output.txt文件中，并发异常信息返回给客户端
-                    std::cerr << e.what() << std::endl;
-
-                    memcpy(data_send, e.what(), strlen(e.what()));
-                    data_send[strlen(e.what())] = '\n';
-                    data_send[strlen(e.what()) + 1] = '\0';
-                    offset = strlen(e.what()) + 1;
-
-                    // 将报错信息写入output.txt
-                    std::fstream outfile;
-                    outfile.open("output.txt",std::ios::out | std::ios::app);
-                    outfile << "failure\n";
-                    outfile.close();
-                }
             }
         }
         if(finish_analyze == false) {
