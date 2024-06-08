@@ -86,50 +86,51 @@ class IndexScanExecutor : public AbstractExecutor {
                 std::swap(cond.lhs_col, cond.rhs_col);
                 cond.op = swap_op.at(cond.op);
             }
-            if(!cond.is_rhs_val || col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end()) 
-            {
-                continue;
-            }
-            ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
-            switch (cond.op)
-            {
-            case OP_GT:
-            case OP_GE:
-                other_col.has_lower_bound = true;
-                other_col.lower_val = cond.rhs_val;
-                break;
-            case OP_LE:
-            case OP_LT:
-                other_col.has_upper_bound = true;
-                other_col.upper_val = cond.rhs_val;
-                break;
-            case OP_EQ:
-                other_col.has_equal_bound = true;
-                other_col.equal_val = cond.rhs_val;
-                other_col.equal_index = i;
-                break;
-            default:
-                break;
-            }
+            // if(!cond.is_rhs_val || col_name_to_index.find(cond.lhs_col.col_name) == col_name_to_index.end()) 
+            // {
+            //     continue;
+            // }
+            // ColRange& other_col = other_col_range[col_name_to_index[cond.lhs_col.col_name]];
+            // switch (cond.op)
+            // {
+            // case OP_GT:
+            // case OP_GE:
+            //     other_col.has_lower_bound = true;
+            //     other_col.lower_val = cond.rhs_val;
+            //     break;
+            // case OP_LE:
+            // case OP_LT:
+            //     other_col.has_upper_bound = true;
+            //     other_col.upper_val = cond.rhs_val;
+            //     break;
+            // case OP_EQ:
+            //     other_col.has_equal_bound = true;
+            //     other_col.equal_val = cond.rhs_val;
+            //     other_col.equal_index = i;
+            //     break;
+            // default:
+            //     break;
+            // }
         }
-        std::vector<int> cond_used(conds_.size(), 0);
-        // 遍历索引各个字段，查找连续的等值条件
-        // TODO: (zzx) 这里还可以继续减少条件，比如部分大于和小于等于的条件也可以删去
-        for (size_t i = 0; i < (size_t)index_meta_.col_num; i++) {
-            if(other_col_range[i].has_equal_bound) {
-                equal_col_num++;
-                cond_used[other_col_range[i].equal_index] = 1;
-            }
-            else {
-                break;
-            }
-        }
-        // 将不连续的条件放入fed_conds_
-        for (size_t i = 0; i < conds_.size(); i++) {
-            if(cond_used[i] == 0) {
-                fed_conds_.push_back(conds_[i]);
-            }
-        }
+        // std::vector<int> cond_used(conds_.size(), 0);
+        // // 遍历索引各个字段，查找连续的等值条件
+        // // TODO: (zzx) 这里还可以继续减少条件，比如部分大于和小于等于的条件也可以删去
+        // for (size_t i = 0; i < (size_t)index_meta_.col_num; i++) {
+        //     if(other_col_range[i].has_equal_bound) {
+        //         equal_col_num++;
+        //         cond_used[other_col_range[i].equal_index] = 1;
+        //     }
+        //     else {
+        //         break;
+        //     }
+        // }
+        // // 将不连续的条件放入fed_conds_
+        // for (size_t i = 0; i < conds_.size(); i++) {
+        //     if(cond_used[i] == 0) {
+        //         fed_conds_.push_back(conds_[i]);
+        //     }
+        // }
+        fed_conds_ = conds_;
     }
 
     void beginTuple() override {
