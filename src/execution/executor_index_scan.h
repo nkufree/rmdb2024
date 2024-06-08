@@ -135,14 +135,15 @@ class IndexScanExecutor : public AbstractExecutor {
     void beginTuple() override {
         // std::cout << "use index" << std::endl;
         IxIndexHandle* ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_)).get();
+        // ih->print_tree();
         // 遍历检索条件，找出索引条件的下限和上限
         char* key = new char[index_meta_.col_tot_len];
         int offset = build_equal_key(key);
         build_lower_key(key, offset);
-        // build_range_key(key, offset, true);
+        build_range_key(key, offset, true);
         Iid lower = ih->lower_bound(key);
         build_upper_key(key, offset);
-        // build_range_key(key, offset, false);
+        build_range_key(key, offset, false);
         Iid upper = ih->upper_bound(key);
         delete[] key;
         // ih->print_tree();
