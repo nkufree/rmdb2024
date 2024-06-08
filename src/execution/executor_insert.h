@@ -70,6 +70,7 @@ class InsertExecutor : public AbstractExecutor {
                 ih->insert_entry(key, rid_, context_->txn_, &success);
                 if(!success) {
                     fh_->delete_record(rid_, context_);
+                    throw IndexDuplicateKeyError();
                     break;
                 }
                 // ih->print_tree();

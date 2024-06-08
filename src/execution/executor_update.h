@@ -81,7 +81,6 @@ class UpdateExecutor : public AbstractExecutor {
                 memcpy(rec->data + col.offset, val.raw->data, col.len);
             }
             // 将更新过后的记录插入索引
-            bool update = true;
             for(auto& index: update_indexes_) {
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 int offset = 0;
@@ -92,12 +91,10 @@ class UpdateExecutor : public AbstractExecutor {
                 bool success;
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
-                    update = false;
-                    break;
+                    throw IndexDuplicateKeyError();
                 }
             }
-            if(update)
-                fh_->update_record(rid, rec->data, context_);
+            fh_->update_record(rid, rec->data, context_);
         }
         delete[] key;
         return nullptr;

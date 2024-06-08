@@ -82,9 +82,9 @@ class IndexEntryNotFoundError : public RMDBError {
     IndexEntryNotFoundError() : RMDBError("Index entry not found") {}
 };
 
-class IndexEntryExistError : public RMDBError {
+class IndexDuplicateKeyError : public RMDBError {
    public:
-    IndexEntryExistError() : RMDBError("Index entry exits") {}
+    IndexDuplicateKeyError() : RMDBError("Index duplicate key") {}
 };
 
 // SM errors

@@ -154,7 +154,7 @@ struct TabMeta {
 
     // 匹配索引，查找最长匹配的索引
     bool modify_and_check_index(std::vector<Condition>& conds, std::vector<std::string>& index_col_names) {
-        return false;
+        // return false;
         std::unordered_map<std::string, std::vector<int>> col_idx_map;
         for(size_t i = 0; i < conds.size(); i++) {
             if(col_idx_map.find(conds[i].lhs_col.col_name) == col_idx_map.end())
