@@ -62,14 +62,23 @@ class InsertExecutor : public AbstractExecutor {
                 auto& index = tab_.indexes[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 int offset = 0;
-                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
-                    memcpy(key + offset, rec.data + index.cols[i].offset, index.cols[i].len);
-                    offset += index.cols[i].len;
+                for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+                    memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
                 }
                 bool success;
                 ih->insert_entry(key, rid_, context_->txn_, &success);
                 if(!success) {
                     fh_->delete_record(rid_, context_);
+                    for(size_t k = 0; k < i; ++k) {
+                        auto& index = tab_.indexes[k];
+                        auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                        for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+                            memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
+                            offset += index.cols[j].len;
+                        }
+                        ih->delete_entry(key, context_->txn_);
+                    }
                     throw IndexDuplicateKeyError();
                     break;
                 }

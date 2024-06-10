@@ -60,42 +60,61 @@ class UpdateExecutor : public AbstractExecutor {
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
+            std::unique_ptr<RmRecord> rec_new(new RmRecord(*rec));
+            for (size_t i = 0; i < set_clauses_.size(); i++) {
+                auto &col = tab_.cols[set_idxs_[i]];
+                auto &val = set_clauses_[i].rhs;
+                memcpy(rec_new->data + col.offset, val.raw->data, col.len);
+            }
             if (rec == nullptr) {
+                delete[] key;
                 throw RecordNotFoundError(rid.page_no, rid.slot_no);
             }
             if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
                 continue;
-            // 从索引中删除旧的记录
-            for(auto& index: update_indexes_) {
+            // 先尝试插入数据，如果插入成功再尝试删除原来的数据
+            int failed_idx = -1;
+            for(size_t i = 0; i < update_indexes_.size(); i++) {
+                auto& index = update_indexes_[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 int offset = 0;
+                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+                    memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
+                    offset += index.cols[i].len;
+                }
+                bool success;
+                ih->insert_entry(key, rid, context_->txn_, &success);
+                if(!success) {
+                    failed_idx = (int)i;
+                    break;
+                }
+                offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
                     memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
                     offset += index.cols[i].len;
                 }
                 ih->delete_entry(key, context_->txn_);
             }
-            for (size_t i = 0; i < set_clauses_.size(); i++) {
-                auto &col = tab_.cols[set_idxs_[i]];
-                auto &val = set_clauses_[i].rhs;
-                memcpy(rec->data + col.offset, val.raw->data, col.len);
-            }
-            // 将更新过后的记录插入索引
-            for(auto& index: update_indexes_) {
-                auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                int offset = 0;
-                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
-                    memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
-                    offset += index.cols[i].len;
-                }
-                bool success;
-                ih->insert_entry(key, rid, context_->txn_, &success);
-                if(!success) {
-                    throw IndexDuplicateKeyError();
+            if(failed_idx != -1) {
+                // 如果失败，删除之前插入的数据
+                for(int i = failed_idx - 1; i >= 0; i--) {
+                    auto& index = update_indexes_[i];
+                    auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                    int offset = 0;
+                    for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+                        memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
+                        offset += index.cols[i].len;
+                    }
+                    ih->delete_entry(key, context_->txn_);
+                    // TODO: 回滚之前更新的数据
                 }
             }
-            fh_->update_record(rid, rec->data, context_);
+            else {
+                // 如果成功，更新表中的数据
+                fh_->update_record(rid, rec_new->data, context_);
+            }
         }
+        
         delete[] key;
         return nullptr;
     }
