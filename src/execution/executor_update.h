@@ -57,6 +57,32 @@ class UpdateExecutor : public AbstractExecutor {
         }
     }
     std::unique_ptr<RmRecord> Next() override {
+        // 先检查是否存在，存在则抛出异常
+        for(auto &rid : rids_) {
+            auto rec = fh_->get_record(rid, context_);
+            for (size_t i = 0; i < set_clauses_.size(); i++) {
+                auto &col = tab_.cols[set_idxs_[i]];
+                auto &val = set_clauses_[i].rhs;
+                memcpy(rec->data + col.offset, val.raw->data, col.len);
+            }
+            for(auto& index: update_indexes_) {
+                auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                char* key = new char[index.col_tot_len];
+                int offset = 0;
+                for (size_t i = 0; i < set_clauses_.size(); i++) {
+                    auto &col = tab_.cols[set_idxs_[i]];
+                    auto &val = set_clauses_[i].rhs;
+                    memcpy(rec->data + col.offset, val.raw->data, col.len);
+                }
+                Iid lower = ih->lower_bound(key);
+                Iid upper = ih->upper_bound(key);
+                if(lower != upper) {
+                    delete[] key;
+                    throw IndexDuplicateKeyError();
+                }
+                delete[] key;
+            }
+        }
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
@@ -107,6 +133,7 @@ class UpdateExecutor : public AbstractExecutor {
                     }
                     ih->delete_entry(key, context_->txn_);
                     // TODO: 回滚之前更新的数据
+                    throw IndexDuplicateKeyError();
                 }
             }
             else {

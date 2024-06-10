@@ -38,8 +38,8 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition>& curr_
             other_conds.push_back(cond);
     }
     bool res = tab.modify_and_check_index(equal_conds, index_col_names);
-    curr_conds.swap(equal_conds);
-    curr_conds.insert(curr_conds.end(), other_conds.begin(), other_conds.end());
+    // curr_conds.swap(equal_conds);
+    // curr_conds.insert(curr_conds.end(), other_conds.begin(), other_conds.end());
     return res;
     // if(tab.is_index(index_col_names)) return true;
     // return false;
