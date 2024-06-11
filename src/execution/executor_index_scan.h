@@ -173,7 +173,8 @@ class IndexScanExecutor : public AbstractExecutor {
                 break;
             rid_ = scan_->rid();
             rec = fh_->get_record(rid_, context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            if(ConditionCheck::check_conditions(conds_, cols_, rec))
+            // if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
                 break;
         }
         
