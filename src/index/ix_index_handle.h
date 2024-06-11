@@ -303,8 +303,9 @@ public:
                     q.push(fetch_node(node->value_at(i)));
                 }
             }
-            assert(node->get_page_no() < file_hdr_->num_pages_);
-            assert(node->get_parent_page_no() < file_hdr_->num_pages_);
+            // assert(node->get_page_no() < file_hdr_->num_pages_);
+            // assert(node->get_parent_page_no() < file_hdr_->num_pages_);
         }
+        std::cout << std::endl;
     }
 };

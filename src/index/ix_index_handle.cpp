@@ -117,7 +117,7 @@ page_id_t IxNodeHandle::internal_lookup(const char *key) {
         return value_at(key_idx);
     else
     {
-        if(ix_compare(get_key(key_idx), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
+        if(key_idx < page_hdr->num_key && ix_compare(get_key(key_idx), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
             return value_at(key_idx);
         else
             return value_at(key_idx - 1);
@@ -579,7 +579,8 @@ void IxIndexHandle::redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node
         Rid* rid = neighbor_node->get_rid(0);
         node->insert_pairs(node->get_size(), key, rid, 1);
         neighbor_node->erase_pair(0);
-        maintain_parent(neighbor_node);
+        parent->set_key(1, neighbor_node->get_key(0));
+        // maintain_parent(neighbor_node);
         maintain_child(node, node->get_size() - 1);
     }
     else
@@ -588,7 +589,8 @@ void IxIndexHandle::redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node
         Rid* rid = neighbor_node->get_rid(neighbor_node->get_size() - 1);
         node->insert_pairs(0, key, rid, 1);
         neighbor_node->erase_pair(neighbor_node->get_size() - 1);
-        maintain_parent(node);
+        parent->set_key(index, neighbor_node->get_key(0));
+        // maintain_parent(node);
         maintain_child(node, 0);
     }
     // std::cout << "Redistribute result: " << std::endl;
