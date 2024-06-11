@@ -149,16 +149,16 @@ class IndexScanExecutor : public AbstractExecutor {
         // ih->print_tree();
         // std::cout << "lower: " << lower.page_no << " " << lower.slot_no << std::endl;
         // std::cout << "upper: " << upper.page_no << " " << upper.slot_no << std::endl;
-        scan_ = std::make_unique<IxScan>(ih, lower, upper, sm_manager_->get_bpm());
-        // scan_ = std::make_unique<IxScan>(ih, ih->leaf_begin(), ih->leaf_end(), sm_manager_->get_bpm());
+        // scan_ = std::make_unique<IxScan>(ih, lower, upper, sm_manager_->get_bpm());
+        scan_ = std::make_unique<IxScan>(ih, ih->leaf_begin(), ih->leaf_end(), sm_manager_->get_bpm());
         // 遍历获取第一个元素
         std::unique_ptr<RmRecord> rec;
         while (!scan_->is_end())
         {
             rid_ = scan_->rid();
             rec = fh_->get_record(rid_, context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
-            // if(ConditionCheck::check_conditions(conds_, cols_, rec))
+            // if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            if(ConditionCheck::check_conditions(conds_, cols_, rec))
                 break;
             scan_->next();
         }
