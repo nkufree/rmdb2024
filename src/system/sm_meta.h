@@ -154,7 +154,14 @@ struct TabMeta {
 
     // 匹配索引，查找最长匹配的索引
     bool modify_and_check_index(std::vector<Condition>& conds, std::vector<std::string>& index_col_names) {
-        // return false;
+        if(conds.size() == 0) {
+            if(indexes.size() == 0) return false;
+            IndexMeta& index_meta = indexes[0];
+            for(ColMeta& col: index_meta.cols) {
+                index_col_names.push_back(col.name);
+            }
+            return true;
+        }
         std::unordered_map<std::string, std::vector<int>> col_idx_map;
         for(size_t i = 0; i < conds.size(); i++) {
             if(col_idx_map.find(conds[i].lhs_col.col_name) == col_idx_map.end())
@@ -186,24 +193,6 @@ struct TabMeta {
         for(ColMeta& col: index_meta.cols) {
             index_col_names.push_back(col.name);
         }
-        // bool col_end = false;
-        // for(ColMeta& col: index_meta.cols) {
-        //     index_col_names.push_back(col.name);
-        //     auto it = col_idx_map.find(col.name);
-        //     if(it == col_idx_map.end() || col_end) {
-        //         col_end = true;
-        //         continue;
-        //     }
-        //     for(int idx: it->second) {
-        //         new_conds.push_back(conds[idx]);
-        //     }
-        //     col_idx_map.erase(it);
-        // }
-        // for(auto p : col_idx_map) {
-        //     for(int idx: p.second)
-        //         new_conds.push_back(conds[idx]);
-        // }
-        // conds.swap(new_conds);
         return true;
     }
 

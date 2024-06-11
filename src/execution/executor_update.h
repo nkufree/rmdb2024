@@ -69,10 +69,9 @@ class UpdateExecutor : public AbstractExecutor {
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 char* key = new char[index.col_tot_len];
                 int offset = 0;
-                for (size_t i = 0; i < set_clauses_.size(); i++) {
-                    auto &col = tab_.cols[set_idxs_[i]];
-                    auto &val = set_clauses_[i].rhs;
-                    memcpy(rec->data + col.offset, val.raw->data, col.len);
+                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+                    memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
+                    offset += index.cols[i].len;
                 }
                 Iid lower = ih->lower_bound(key);
                 Iid upper = ih->upper_bound(key);
