@@ -386,6 +386,11 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     // std::cout << "End Insert into parent" << std::endl;
 }
 
+page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction) {
+    bool success;
+    return insert_entry(key, value, transaction, &success);
+}
+
 /**
  * @brief 将指定键值对插入到B+树中
  * @param (key, value) 要插入的键值对
@@ -589,7 +594,7 @@ void IxIndexHandle::redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node
         Rid* rid = neighbor_node->get_rid(neighbor_node->get_size() - 1);
         node->insert_pairs(0, key, rid, 1);
         neighbor_node->erase_pair(neighbor_node->get_size() - 1);
-        parent->set_key(index, neighbor_node->get_key(0));
+        parent->set_key(index, node->get_key(0));
         // maintain_parent(node);
         maintain_child(node, 0);
     }

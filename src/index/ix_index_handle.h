@@ -224,6 +224,7 @@ class IxIndexHandle {
 
     // for insert
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success);
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
 
     IxNodeHandle *split(IxNodeHandle *node);
 
@@ -277,7 +278,13 @@ public:
     int get_btree_order() const { return file_hdr_->btree_order_; }
 
     void print_tree() {
-        std::cout << "B+ Tree: " << std::endl;
+        std::cout << "B+ Tree: " 
+        << "root: " << file_hdr_->root_page_
+        << " order: " << file_hdr_->btree_order_
+        << " num_pages: " << file_hdr_->num_pages_
+        << "first_leaf: " << file_hdr_->first_leaf_
+        << "last_leaf: " << file_hdr_->last_leaf_
+        << std::endl;
         IxNodeHandle *root = fetch_node(file_hdr_->root_page_);
         std::queue<IxNodeHandle *> q;
         q.push(root);
@@ -286,7 +293,10 @@ public:
             assert(node->get_page_no() > 1);
             q.pop();
             std::cout << "node: " << node->get_page_no()
-            << ", parent: " << node->get_parent_page_no() << std::endl
+            << ", parent: " << node->get_parent_page_no()
+            << ", prev: " << node->get_prev_leaf()
+            << ", next: " << node->get_next_leaf()
+            << std::endl
             << "is_leaf: " << node->is_leaf_page() << std::endl;
             std::cout << "key: ";
             for (int i = 0; i < node->get_size(); i++) {
