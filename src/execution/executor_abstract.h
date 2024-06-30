@@ -15,6 +15,18 @@ See the Mulan PSL v2 for more details. */
 #include "index/ix.h"
 #include "system/sm.h"
 
+enum ExecutorType {
+    AGGREGATION_EXECUTOR,
+    DELETE_EXECUTOR,
+    PROJECTION_EXECUTOR,
+    SEQ_SCAN_EXECUTOR,
+    UPDATE_EXECUTOR,
+    NESTEDLOOP_JOIN_EXECUTOR,
+    SORT_EXECUTOR,
+    INSERT_EXECUTOR,
+    INDEX_SCAN_EXECUTOR,
+};
+
 class AbstractExecutor {
    public:
     Rid _abstract_rid;
@@ -30,7 +42,9 @@ class AbstractExecutor {
         return *_cols;
     };
 
-    virtual std::string getType() { return "AbstractExecutor"; };
+    virtual ExecutorType getType() {
+        throw InternalError("virtual member function not implemented");
+    };
 
     virtual void beginTuple(){};
 
@@ -44,13 +58,19 @@ class AbstractExecutor {
 
     virtual ColMeta get_col_offset(const TabCol &target) { return ColMeta();};
 
-    static std::vector<ColMeta>::const_iterator get_col(const std::vector<ColMeta> &rec_cols, const TabCol &target) {
-        auto pos = std::find_if(rec_cols.begin(), rec_cols.end(), [&](const ColMeta &col) {
-            return col.tab_name == target.tab_name && col.name == target.col_name;
+    static std::vector<ColMeta>::const_iterator get_col(const std::vector<ColMeta> &rec_cols, const TabCol &target, bool aggr = false) {
+        // 新增一个参数来考虑聚合
+        auto pos = std::find_if(rec_cols.begin(), rec_cols.end(), [&target, aggr](const ColMeta &col) {
+            if (!aggr) {
+                return col.tab_name == target.tab_name && col.name == target.col_name;
+            } else {
+                return col.tab_name == target.tab_name && col.name == target.col_name && col.aggr == target.aggr;
+            }
         });
         if (pos == rec_cols.end()) {
             throw ColumnNotFoundError(target.tab_name + '.' + target.col_name);
         }
         return pos;
     }
+
 };

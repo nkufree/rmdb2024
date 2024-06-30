@@ -19,15 +19,18 @@ See the Mulan PSL v2 for more details. */
 #include "common/common.h"
 #include "errors.h"
 #include "sm_defs.h"
+#include "parser/ast.h"
 
 /* 字段元数据 */
 struct ColMeta {
     std::string tab_name;   // 字段所属表名称
     std::string name;       // 字段名称
+    std::string alias;      // 字段别名
     ColType type;           // 字段类型
     int len;                // 字段长度
     int offset;             // 字段位于记录中的偏移量
     bool index;             /** unused */
+    ast::AggregationType aggr = ast::NO_AGGR;
 
     friend std::ostream &operator<<(std::ostream &os, const ColMeta &col) {
         // ColMeta中有各个基本类型的变量，然后调用重载的这些变量的操作符<<（具体实现逻辑在defs.h）

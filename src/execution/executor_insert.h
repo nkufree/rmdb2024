@@ -48,9 +48,12 @@ class InsertExecutor : public AbstractExecutor {
             for (size_t i = 0; i < values.size(); i++) {
                 auto &col = tab_.cols[i];
                 auto &val = values[i];
-                if (col.type != val.type) {
-                val.value_cast(col.type);
+                bool isMatch = (col.type == val.type || (col.type == TYPE_INT && val.type == TYPE_FLOAT) || (col.type == TYPE_FLOAT && val.type == TYPE_INT));
+                if (col.type != val.type && ! isMatch) {
+                    throw IncompatibleTypeError(coltype2str(col.type), coltype2str(val.type));
                 }
+            val.try_cast_to(col.type);
+
                 val.init_raw(col.len);
                 memcpy(rec.data + col.offset, val.raw->data, col.len);
             }
