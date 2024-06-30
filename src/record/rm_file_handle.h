@@ -85,6 +85,8 @@ class RmFileHandle {
 
     RmPageHandle fetch_page_handle(int page_no) const;
 
+    bool clear_pages(){ return buffer_pool_manager_->delete_all_pages(fd_); }
+
    private:
     RmPageHandle create_page_handle();
 

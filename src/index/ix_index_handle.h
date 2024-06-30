@@ -12,10 +12,14 @@ See the Mulan PSL v2 for more details. */
 
 #include "ix_defs.h"
 #include "transaction/transaction.h"
+#include <queue>
 
 enum class Operation { FIND = 0, INSERT, DELETE };  // 三种操作：查找、插入、删除
 
 static const bool binary_search = false;
+
+
+
 
 inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
     switch (type) {
@@ -45,6 +49,37 @@ inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& 
     }
     return 0;
 }
+
+// 二分查找
+// inline int ix_binary_search(int left, int right, char* keys, const char*target, const IxFileHdr* file_hdr, int col_num, bool find_left = true) {
+//     if(right < left)
+//         return left;
+//     while(left < right){
+//         int mid = (left + right) / 2;
+//         char* curr = keys + mid * file_hdr->col_tot_len_;
+//         int comp = ix_compare(curr, target, file_hdr->col_types_, file_hdr->col_lens_, col_num);
+//         if(comp == 0){
+//             if(find_left) {
+//                 right = mid;
+//             }
+//             else {
+//                 left = mid + 1;
+//             }
+//         }
+//         else if(comp < 0){
+//             left = mid + 1;
+//         }
+//         else{
+//             right = mid;
+//         }
+//     }
+//     int comp = ix_compare(keys + right * file_hdr->col_tot_len_, target, file_hdr->col_types_, file_hdr->col_lens_, col_num);
+//     if(comp < 0)
+//         return right + 1;
+//     else if(comp == 0 && !find_left)
+//         return right + 1;
+//     return right;
+// }
 
 /* 管理B+树中的每个节点 */
 class IxNodeHandle {
@@ -155,6 +190,15 @@ class IxNodeHandle {
         assert(rid_idx < page_hdr->num_key);
         return rid_idx;
     }
+
+    void print_info() {
+        std::cout << "page_no: " << get_page_no() << " is_leaf: " << is_leaf_page() << " parent: " << get_parent_page_no() << std::endl
+                  << " num_key: " << get_size() << " next_leaf: " << get_next_leaf() << " prev_leaf: " << get_prev_leaf()
+                  << std::endl;
+        for (int i = 0; i < get_size(); i++) {
+            std::cout << "key: " << key_at(i) << " value: " << value_at(i)   << " " << get_rid(i)->slot_no << std::endl;
+        }
+    }
 };
 
 /* B+树 */
@@ -179,6 +223,7 @@ class IxIndexHandle {
                                                  bool find_first = false);
 
     // for insert
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success);
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
 
     IxNodeHandle *split(IxNodeHandle *node);
@@ -205,6 +250,8 @@ class IxIndexHandle {
 
     Iid leaf_begin() const;
 
+    bool clear_pages(){ return buffer_pool_manager_->delete_all_pages(fd_); }
+
    private:
     // 辅助函数
     void update_root_page_no(page_id_t root) { file_hdr_->root_page_ = root; }
@@ -226,5 +273,49 @@ class IxIndexHandle {
     void maintain_child(IxNodeHandle *node, int child_idx);
 
     // for index test
+public:
     Rid get_rid(const Iid &iid) const;
+    int get_btree_order() const { return file_hdr_->btree_order_; }
+
+    void print_tree() {
+        std::cout << "B+ Tree: " 
+        << "root: " << file_hdr_->root_page_
+        << " order: " << file_hdr_->btree_order_
+        << " num_pages: " << file_hdr_->num_pages_
+        << "first_leaf: " << file_hdr_->first_leaf_
+        << "last_leaf: " << file_hdr_->last_leaf_
+        << std::endl;
+        IxNodeHandle *root = fetch_node(file_hdr_->root_page_);
+        std::queue<IxNodeHandle *> q;
+        q.push(root);
+        while (!q.empty()) {
+            IxNodeHandle *node = q.front();
+            assert(node->get_page_no() > 1);
+            q.pop();
+            std::cout << "node: " << node->get_page_no()
+            << ", parent: " << node->get_parent_page_no()
+            << ", prev: " << node->get_prev_leaf()
+            << ", next: " << node->get_next_leaf()
+            << std::endl
+            << "is_leaf: " << node->is_leaf_page() << std::endl;
+            std::cout << "key: ";
+            for (int i = 0; i < node->get_size(); i++) {
+                std::cout << node->key_at(i) << " ";
+            }
+            std::cout << std::endl;
+            std::cout << "value: ";
+            for (int i = 0; i < node->get_size(); i++) {
+                std::cout << node->value_at(i) << " ";
+            }
+            std::cout << std::endl;
+            if (!node->is_leaf_page()) {
+                for (int i = 0; i < node->get_size(); i++) {
+                    q.push(fetch_node(node->value_at(i)));
+                }
+            }
+            // assert(node->get_page_no() < file_hdr_->num_pages_);
+            // assert(node->get_parent_page_no() < file_hdr_->num_pages_);
+        }
+        std::cout << std::endl;
+    }
 };
