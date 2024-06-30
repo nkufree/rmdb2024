@@ -71,11 +71,12 @@ class InsertExecutor : public AbstractExecutor {
                 if(!success) {
                     fh_->delete_record(rid_, context_);
                     for(size_t k = 0; k < i; ++k) {
-                        auto& index = tab_.indexes[k];
-                        auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                        for(size_t j = 0; j < (size_t)index.col_num; ++j) {
-                            memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
-                            offset += index.cols[j].len;
+                        offset = 0;
+                        auto& del_index = tab_.indexes[k];
+                        auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, del_index.cols)).get();
+                        for(size_t j = 0; j < (size_t)del_index.col_num; ++j) {
+                            memcpy(key + offset, rec.data + del_index.cols[j].offset, del_index.cols[j].len);
+                            offset += del_index.cols[j].len;
                         }
                         ih->delete_entry(key, context_->txn_);
                     }

@@ -459,7 +459,8 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
         }
     }
     buffer_pool_manager_->unpin_page(node->get_page_id(), true);
-    // print_tree();
+    //std::cout << "delete entry: " << *(int*)key << (char*)(key + sizeof(int)) << std::endl;
+    //print_tree();
     return true;
 }
 

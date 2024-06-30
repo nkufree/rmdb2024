@@ -113,8 +113,7 @@ class UpdateExecutor : public AbstractExecutor {
                 bool success;
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
-                    failed_idx = (int)i;
-                    break;
+                    continue;
                 }
                 offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
