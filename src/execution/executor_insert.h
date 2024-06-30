@@ -43,6 +43,7 @@ class InsertExecutor : public AbstractExecutor {
     std::unique_ptr<RmRecord> Next() override {
         // Make record buffer
         RmRecord rec(fh_->get_file_hdr().record_size);
+        char* key = new char[tab_.get_col_total_len()];
         for(auto &values : values_) {
             for (size_t i = 0; i < values.size(); i++) {
                 auto &col = tab_.cols[i];
@@ -60,15 +61,32 @@ class InsertExecutor : public AbstractExecutor {
             for(size_t i = 0; i < tab_.indexes.size(); ++i) {
                 auto& index = tab_.indexes[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                char* key = new char[index.col_tot_len];
                 int offset = 0;
-                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
-                    memcpy(key + offset, rec.data + index.cols[i].offset, index.cols[i].len);
-                    offset += index.cols[i].len;
+                for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+                    memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
                 }
-                ih->insert_entry(key, rid_, context_->txn_);
+                bool success;
+                ih->insert_entry(key, rid_, context_->txn_, &success);
+                if(!success) {
+                    fh_->delete_record(rid_, context_);
+                    for(size_t k = 0; k < i; ++k) {
+                        offset = 0;
+                        auto& del_index = tab_.indexes[k];
+                        auto del_ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, del_index.cols)).get();
+                        for(size_t j = 0; j < (size_t)del_index.col_num; ++j) {
+                            memcpy(key + offset, rec.data + del_index.cols[j].offset, del_index.cols[j].len);
+                            offset += del_index.cols[j].len;
+                        }
+                        del_ih->delete_entry(key, context_->txn_);
+                    }
+                    throw IndexDuplicateKeyError();
+                    break;
+                }
+                // ih->print_tree();
             }
         }
+        delete[] key;
         return nullptr;
     }
     Rid &rid() override { return rid_; }

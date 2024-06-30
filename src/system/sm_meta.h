@@ -15,7 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include <map>
 #include <string>
 #include <vector>
-
+#include <unordered_map>
+#include "common/common.h"
 #include "errors.h"
 #include "sm_defs.h"
 
@@ -115,6 +116,25 @@ struct TabMeta {
         throw IndexNotFoundError(name, col_names);
     }
 
+    /* 根据字段元数据集合获取索引元数据 */
+    std::vector<IndexMeta>::iterator get_index_meta(const std::vector<ColMeta>& cols) {
+        for(auto index = indexes.begin(); index != indexes.end(); ++index) {
+            if((*index).col_num != (int)cols.size()) continue;
+            auto& index_cols = (*index).cols;
+            size_t i = 0;
+            for(; i < cols.size(); ++i) {
+                if(index_cols[i].name.compare(cols[i].name) != 0) 
+                    break;
+            }
+            if(i == cols.size()) return index;
+        }
+        std::vector<std::string> col_names;
+        for(auto& col: cols) {
+            col_names.push_back(col.name);
+        }
+        throw IndexNotFoundError(name, col_names);
+    }
+
     /* 根据字段名称获取字段元数据 */
     std::vector<ColMeta>::iterator get_col(const std::string &col_name) {
         auto pos = std::find_if(cols.begin(), cols.end(), [&](const ColMeta &col) { return col.name == col_name; });
@@ -122,6 +142,58 @@ struct TabMeta {
             throw ColumnNotFoundError(col_name);
         }
         return pos;
+    }
+
+    int get_col_total_len() {
+        int total_len = 0;
+        for(auto& col: cols) {
+            total_len += col.len;
+        }
+        return total_len;
+    }
+
+    // 匹配索引，查找最长匹配的索引
+    bool modify_and_check_index(std::vector<Condition>& conds, std::vector<std::string>& index_col_names) {
+        if(conds.size() == 0) {
+            if(indexes.size() == 0) return false;
+            IndexMeta& index_meta = indexes[0];
+            for(ColMeta& col: index_meta.cols) {
+                index_col_names.push_back(col.name);
+            }
+            return true;
+        }
+        std::unordered_map<std::string, std::vector<int>> col_idx_map;
+        for(size_t i = 0; i < conds.size(); i++) {
+            if(col_idx_map.find(conds[i].lhs_col.col_name) == col_idx_map.end())
+                col_idx_map[conds[i].lhs_col.col_name] = std::vector<int>{(int)i};
+            else
+                col_idx_map[conds[i].lhs_col.col_name].push_back(i);
+        }
+        // std::vector<Condition> new_conds;
+        int max_match_len = 0;
+        int max_match_idx = -1;
+        for(size_t i = 0; i < indexes.size(); i++) {
+            int match_len = 0;
+            IndexMeta& index_meta = indexes[i];
+            for(ColMeta& col: index_meta.cols) {
+                if(col_idx_map.find(col.name) != col_idx_map.end()) {
+                    match_len++;
+                }
+                else {
+                    break;
+                }
+            }
+            if(match_len > max_match_len) {
+                max_match_len = match_len;
+                max_match_idx = i;
+            }
+        }
+        if(max_match_idx == -1) return false;
+        IndexMeta& index_meta = indexes[max_match_idx];
+        for(ColMeta& col: index_meta.cols) {
+            index_col_names.push_back(col.name);
+        }
+        return true;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const TabMeta &tab) {
