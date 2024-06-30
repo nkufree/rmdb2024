@@ -225,7 +225,8 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     }
     auto &fh = fhs_[tab_name];
     // 删除所有索引
-    for(auto &index: db_.get_table(tab_name).indexes) {
+    auto indexes = db_.get_table(tab_name).indexes;
+    for(auto &index: indexes) {
         drop_index(tab_name, index.cols, context);
     }
     // 删除表

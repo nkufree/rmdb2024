@@ -175,7 +175,7 @@ int IxNodeHandle::insert(const char *key, const Rid &value) {
     // 1
     int pos = lower_bound(key);
     // 2,3
-    if(ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) != 0)
+    if(pos >= page_hdr->num_key || ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) != 0)
     {
         insert_pairs(pos, key, &value, 1);
     }
@@ -214,7 +214,7 @@ int IxNodeHandle::remove(const char *key) {
     // 3. 返回完成删除操作后的键值对数量
     int pos = lower_bound(key);
     // 2,3
-    if(ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
+    if(pos < page_hdr->num_key && ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
     {
         erase_pair(pos);
     }

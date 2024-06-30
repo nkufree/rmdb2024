@@ -73,12 +73,12 @@ class InsertExecutor : public AbstractExecutor {
                     for(size_t k = 0; k < i; ++k) {
                         offset = 0;
                         auto& del_index = tab_.indexes[k];
-                        auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, del_index.cols)).get();
+                        auto del_ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, del_index.cols)).get();
                         for(size_t j = 0; j < (size_t)del_index.col_num; ++j) {
                             memcpy(key + offset, rec.data + del_index.cols[j].offset, del_index.cols[j].len);
                             offset += del_index.cols[j].len;
                         }
-                        ih->delete_entry(key, context_->txn_);
+                        del_ih->delete_entry(key, context_->txn_);
                     }
                     throw IndexDuplicateKeyError();
                     break;
