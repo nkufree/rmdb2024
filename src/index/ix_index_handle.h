@@ -273,8 +273,8 @@ class IxIndexHandle {
     void maintain_child(IxNodeHandle *node, int child_idx);
 
     // for index test
-    Rid get_rid(const Iid &iid) const;
 public:
+    Rid get_rid(const Iid &iid) const;
     int get_btree_order() const { return file_hdr_->btree_order_; }
 
     void print_tree() {

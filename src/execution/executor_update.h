@@ -76,8 +76,11 @@ class UpdateExecutor : public AbstractExecutor {
                 Iid lower = ih->lower_bound(key);
                 Iid upper = ih->upper_bound(key);
                 if(lower != upper) {
-                    delete[] key;
-                    throw IndexDuplicateKeyError();
+                    Rid curr = ih->get_rid(lower);
+                    if(!(curr == rid)) {
+                        delete[] key;
+                        throw IndexDuplicateKeyError();
+                    }
                 }
                 delete[] key;
             }
