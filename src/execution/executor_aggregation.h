@@ -124,7 +124,7 @@ class AggregationExecutor : public AbstractExecutor {
             char *base = handle->data;
             if (!std::all_of(having_conds_.begin(), having_conds_.end(), [base, this](const Condition& cond) {
                 if(cond.lhs_col.aggr == ast::NO_AGGR) {
-                    auto value = Value::col2Value(base, *get_col(sel_cols_origin, cond.lhs_col, true));
+                    auto value = get_col(sel_cols_origin, cond.lhs_col, true)->to_value(base);
                     return cond.eval_with_rvalue(value);
                 } else {
                     ColMeta col_meta;
@@ -134,7 +134,24 @@ class AggregationExecutor : public AbstractExecutor {
                         col_meta = *get_col(sel_cols_origin, cond.lhs_col, true);
                     }
                     auto value = aggregate_value(col_meta);
-                    return cond.eval_with_rvalue(value);
+                    Value rhs_val = cond.rhs_val;
+                    if(value.type != rhs_val.type)
+                    {
+                        if(value.type == ColType::TYPE_INT && rhs_val.type == ColType::TYPE_FLOAT)
+                        {
+                            value.set_float(value.int_val);
+                            // rhs_val.set_int(rhs_val.float_val);
+                        }
+                        else if(value.type == ColType::TYPE_FLOAT && rhs_val.type == ColType::TYPE_INT)
+                        {
+                            rhs_val.set_float(rhs_val.int_val);
+                        }
+                        else
+                        {
+                            throw IncompatibleTypeError(coltype2str(value.type), coltype2str(rhs_val.type));
+                        }
+                    }
+                    return cond.check_condition(value, rhs_val);
                 }
             })) {
                 to_delete.push_back(i);
@@ -170,7 +187,7 @@ class AggregationExecutor : public AbstractExecutor {
         }
         switch (sel_col.aggr) {
             case ast::NO_AGGR:
-                val = Value::col2Value(curr_records[0]->data, sel_col);
+                val = sel_col.to_value(curr_records[0]->data);
                 val.init_raw(sel_col.len);
                 break;
             case ast::AGGR_TYPE_COUNT:
@@ -180,18 +197,18 @@ class AggregationExecutor : public AbstractExecutor {
                 break;
             case ast::AGGR_TYPE_MAX:
                 val.type = sel_col.type;
-                val = Value::col2Value(curr_records[0]->data, sel_col);
+                val = sel_col.to_value(curr_records[0]->data);
                 for (auto &record : curr_records) {
-                    Value tmp = Value::col2Value(record->data, sel_col);
+                    Value tmp = sel_col.to_value(record->data);
                     if (tmp > val) val = tmp;
                 }
                 val.init_raw(sel_col.len);
                 break;
             case ast::AGGR_TYPE_MIN:
                 val.type = sel_col.type;
-                val = Value::col2Value(curr_records[0]->data, sel_col);
+                val = sel_col.to_value(curr_records[0]->data);
                 for (auto &record : curr_records) {
-                    Value tmp = Value::col2Value(record->data, sel_col);
+                    Value tmp = sel_col.to_value(record->data);
                     if (tmp < val) val = tmp;
                 }
                 val.init_raw(sel_col.len);

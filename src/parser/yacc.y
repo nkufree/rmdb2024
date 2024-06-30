@@ -44,7 +44,7 @@ WHERE UPDATE SET SELECT MAX MIN SUM COUNT AS INT CHAR FLOAT INDEX AND JOIN EXIT 
 %type <sv_vals_list> valuesList
 %type <sv_str> tbName colName alias
 %type <sv_strs> tableList colNameList
-%type <sv_col> col
+%type <sv_col> col colEach
 %type <sv_cols> colList selector
 %type <sv_set_clause> setClause
 %type <sv_set_clauses> setClauses
@@ -306,24 +306,24 @@ col:
         $$ = std::make_shared<Col>("", $1);
     }
     // 这里是别名、聚合函数的处理
-    |   tbName '.' colName AS alias
-    {
-        $$ = std::make_shared<Col>($1, $3, $5);
-    }
-    |   colName AS alias
-    {
-        $$ = std::make_shared<Col>("", $1, $3);
-    }
+    // |   tbName '.' colName AS alias
+    // {
+    //     $$ = std::make_shared<Col>($1, $3, $5);
+    // }
+    // |   colName AS alias
+    // {
+    //     $$ = std::make_shared<Col>("", $1, $3);
+    // }
     |   opt_aggregate '(' tbName '.' colName ')'
     {
         $$ = std::make_shared<Col>($3, $5);
         $$->aggr_type = $1;
     }
-    |   opt_aggregate '(' tbName '.' colName ')' AS alias
-    {
-        $$ = std::make_shared<Col>($3, $5, $8);
-        $$->aggr_type = $1;
-    }
+    // |   opt_aggregate '(' tbName '.' colName ')' AS alias
+    // {
+    //     $$ = std::make_shared<Col>($3, $5, $8);
+    //     $$->aggr_type = $1;
+    // }
     |   opt_aggregate '(' colName ')'
     {
         $$ = std::make_shared<Col>("", $3);
@@ -334,37 +334,39 @@ col:
         $$ = std::make_shared<Col>("", "*");
         $$->aggr_type = $1;
     }
-    |   opt_aggregate '(' colName ')' AS alias
-    {
-        $$ = std::make_shared<Col>("", $3, $6);
-        $$->aggr_type = $1;
-    }
-    |   opt_aggregate '(' '*' ')' AS alias
-    {
-        $$ = std::make_shared<Col>("", "*", $6);
-        $$->aggr_type = $1;
-    }
+    // |   opt_aggregate '(' colName ')' AS alias
+    // {
+    //     $$ = std::make_shared<Col>("", $3, $6);
+    //     $$->aggr_type = $1;
+    // }
+    // |   opt_aggregate '(' '*' ')' AS alias
+    // {
+    //     $$ = std::make_shared<Col>("", "*", $6);
+    //     $$->aggr_type = $1;
+    // }
     ;
 
 
 colList:
-        col
+        colEach
     {
         $$ = std::vector<std::shared_ptr<Col>>{$1};
+    }
+    |   colList ',' colEach
+    {
+        $$.push_back($3);
+    }
+    ;
+
+colEach:
+        col
+    {
+        $$ = $1;
     }
     |   col AS alias
     {
         $1->alias = $3;
-        $$ = std::vector<std::shared_ptr<Col>>{$1};
-    }
-    |   colList ',' col
-    {
-        $$.push_back($3);
-    }
-    |   colList ',' col AS alias
-    {
-        $3->alias = $5;
-        $$.push_back($3);
+        $$ = $1;
     }
     ;
 

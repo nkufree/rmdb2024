@@ -41,6 +41,28 @@ struct ColMeta {
     friend std::istream &operator>>(std::istream &is, ColMeta &col) {
         return is >> col.tab_name >> col.name >> col.type >> col.len >> col.offset >> col.index;
     }
+
+    Value to_value(char* base) const {
+        Value value;
+        switch (type) {
+            case TYPE_INT:
+                value.set_int(*(int *) (base + offset));
+                break;
+            case TYPE_FLOAT:
+                value.set_float(*(float *) (base + offset));
+                break;
+            case TYPE_STRING: {
+                std::string str((char *) (base + offset), len);
+                // 去掉末尾的'\0', 考虑无tailing-zero的情况
+                str.resize(std::min(str.find('\0'), (size_t)len));
+                value.set_str(str);
+                break;
+            }
+            default:
+                throw InternalError("not implemented");
+        }
+        return value;
+    }
 };
 
 /* 索引元数据 */

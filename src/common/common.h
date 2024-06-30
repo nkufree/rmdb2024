@@ -86,27 +86,27 @@ struct Value {
         type = new_type;
     }
 
-    static Value col2Value(char *base, const ColMeta& meta) {
-        Value value;
-        switch (meta.type) {
-            case TYPE_INT:
-                value.set_int(*(int *) (base + meta.offset));
-                break;
-            case TYPE_FLOAT:
-                value.set_float(*(float *) (base + meta.offset));
-                break;
-            case TYPE_STRING: {
-                std::string str((char *) (base + meta.offset), meta.len);
-                // 去掉末尾的'\0', 考虑无tailing-zero的情况
-                str.resize(std::min(str.find('\0'), (size_t)meta.len));
-                value.set_str(str);
-                break;
-            }
-            default:
-                throw InternalError("not implemented");
-        }
-        return value;
-    }
+    // static Value col2Value(char *base, const ColMeta& meta) {
+    //     Value value;
+    //     switch (meta.type) {
+    //         case TYPE_INT:
+    //             value.set_int(*(int *) (base + meta.offset));
+    //             break;
+    //         case TYPE_FLOAT:
+    //             value.set_float(*(float *) (base + meta.offset));
+    //             break;
+    //         case TYPE_STRING: {
+    //             std::string str((char *) (base + meta.offset), meta.len);
+    //             // 去掉末尾的'\0', 考虑无tailing-zero的情况
+    //             str.resize(std::min(str.find('\0'), (size_t)meta.len));
+    //             value.set_str(str);
+    //             break;
+    //         }
+    //         default:
+    //             throw InternalError("not implemented");
+    //     }
+    //     return value;
+    // }
 
     void float2int(){
         assert(type == TYPE_FLOAT);
