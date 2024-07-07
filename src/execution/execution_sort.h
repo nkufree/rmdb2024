@@ -46,4 +46,6 @@ class SortExecutor : public AbstractExecutor {
     }
 
     Rid &rid() override { return _abstract_rid; }
+
+    ExecutorType getType() override { return ExecutorType::SORT_EXECUTOR; }
 };

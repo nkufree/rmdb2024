@@ -33,8 +33,14 @@ class Query{
     std::vector<std::string> tables;
     // update 的set 值
     std::vector<SetClause> set_clauses;
-    //insert 的values值
+    // insert 的values值
     std::vector<std::vector<Value>> values;
+
+    bool has_aggr;
+    // group
+    std::vector<TabCol> group_cols;
+    // having
+    std::vector<Condition> having_conds;
 
     Query(){}
 
@@ -54,8 +60,9 @@ private:
     TabCol check_column(const std::vector<ColMeta> &all_cols, TabCol target);
     void get_all_cols(const std::vector<std::string> &tab_names, std::vector<ColMeta> &all_cols);
     void get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv_conds, std::vector<Condition> &conds);
-    void check_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds);
+    void check_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds, bool is_having);
     void check_on_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds);
+    void check_fix_clause(const std::string &tab_name, std::vector<SetClause>& clauses);
     Value convert_sv_value(const std::shared_ptr<ast::Value> &sv_val);
     CompOp convert_sv_comp_op(ast::SvCompOp op);
     bool value_type_match(ColType type1, ColType type2);

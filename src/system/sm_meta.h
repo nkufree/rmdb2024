@@ -19,15 +19,18 @@ See the Mulan PSL v2 for more details. */
 #include "common/common.h"
 #include "errors.h"
 #include "sm_defs.h"
+#include "parser/ast.h"
 
 /* 字段元数据 */
 struct ColMeta {
     std::string tab_name;   // 字段所属表名称
     std::string name;       // 字段名称
+    std::string alias;      // 字段别名
     ColType type;           // 字段类型
     int len;                // 字段长度
     int offset;             // 字段位于记录中的偏移量
     bool index;             /** unused */
+    ast::AggregationType aggr = ast::NO_AGGR;
 
     friend std::ostream &operator<<(std::ostream &os, const ColMeta &col) {
         // ColMeta中有各个基本类型的变量，然后调用重载的这些变量的操作符<<（具体实现逻辑在defs.h）
@@ -37,6 +40,28 @@ struct ColMeta {
 
     friend std::istream &operator>>(std::istream &is, ColMeta &col) {
         return is >> col.tab_name >> col.name >> col.type >> col.len >> col.offset >> col.index;
+    }
+
+    Value to_value(char* base) const {
+        Value value;
+        switch (type) {
+            case TYPE_INT:
+                value.set_int(*(int *) (base + offset));
+                break;
+            case TYPE_FLOAT:
+                value.set_float(*(float *) (base + offset));
+                break;
+            case TYPE_STRING: {
+                std::string str((char *) (base + offset), len);
+                // 去掉末尾的'\0', 考虑无tailing-zero的情况
+                str.resize(std::min(str.find('\0'), (size_t)len));
+                value.set_str(str);
+                break;
+            }
+            default:
+                throw InternalError("not implemented");
+        }
+        return value;
     }
 };
 

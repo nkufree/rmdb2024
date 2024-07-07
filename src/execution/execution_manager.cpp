@@ -154,7 +154,10 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     std::vector<std::string> captions;
     captions.reserve(sel_cols.size());
     for (auto &sel_col : sel_cols) {
-        captions.push_back(sel_col.col_name);
+        //captions.push_back(sel_col.col_name);
+        if (sel_col.alias != "") captions.push_back(sel_col.alias);
+        else captions.push_back(sel_col.col_name);
+
     }
 
     // Print header into buffer
@@ -170,7 +173,7 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
         outfile << " " << captions[i] << " |";
     }
     outfile << "\n";
-
+    
     // Print records
     size_t num_rec = 0;
     // 执行query_plan
@@ -187,7 +190,10 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
             } else if (col.type == TYPE_STRING) {
                 col_str = std::string((char *)rec_buf, col.len);
                 col_str.resize(strlen(col_str.c_str()));
+            }  else if (col.type == TYPE_NULL) {
+                col_str = "NULL";
             }
+
             columns.push_back(col_str);
         }
         // print record into buffer
