@@ -168,6 +168,12 @@ void *client_handler(void *sock_fd) {
                 }
             }
         }
+        else {
+            std::fstream outfile;
+            outfile.open("output.txt",std::ios::out | std::ios::app);
+            outfile << "failure\n";
+            outfile.close();
+        }
         if(finish_analyze == false) {
             yy_delete_buffer(buf);
             pthread_mutex_unlock(buffer_mutex);
