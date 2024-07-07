@@ -179,7 +179,7 @@ class AggregationExecutor : public AbstractExecutor {
 
     Value aggregate_value(ColMeta sel_col) {
         Value val;
-        if (curr_records.empty()) {
+        if (curr_records.empty() && sel_col.aggr != ast::AGGR_TYPE_COUNT) {
             val.type = sel_col.type;
             val.init_raw(sel_col.len);
             val.type = TYPE_NULL;
