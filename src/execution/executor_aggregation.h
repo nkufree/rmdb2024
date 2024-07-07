@@ -91,6 +91,9 @@ class AggregationExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
+        for(auto &cond : having_conds_) {
+            cond.init();
+        }
         for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
             auto record = prev_->Next();
             store_group(std::move(record));

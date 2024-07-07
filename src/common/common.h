@@ -178,8 +178,12 @@ struct Condition {
     TabCol lhs_col;   // left-hand side column
     CompOp op;        // comparison operator
     bool is_rhs_val;  // true if right-hand side is a value (not a column)
+    bool is_rhs_select; // true if right-hand side is a select statement
     TabCol rhs_col;   // right-hand side column
     Value rhs_val;    // right-hand side value
+    std::shared_ptr<Query> rhs_query;
+    std::shared_ptr<Plan> rhs_plan;
+    std::shared_ptr<PortalStmt> rhs_portal;
 
     bool check_condition(const Value& lhs, const Value& rhs) const {
 
@@ -194,6 +198,12 @@ struct Condition {
         default:
             throw InternalError("Unexpected comparison operator");
         }
+    }
+
+    void init() // 执行子查询
+    {
+        if(!is_rhs_select) return;
+        // TODO: 执行子查询
     }
 
     [[nodiscard]] bool eval_with_rvalue(const Value &lhs) const {

@@ -38,6 +38,9 @@ class DeleteExecutor : public AbstractExecutor {
     }
 
     std::unique_ptr<RmRecord> Next() override {
+        for(auto &cond : conds_) {
+            cond.init();
+        }
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);

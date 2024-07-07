@@ -48,6 +48,9 @@ class SeqScanExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
+        for(auto &cond : fed_conds_) {
+            cond.init();
+        }
         scan_ = std::make_unique<RmScan>(fh_);
         // rid_ = scan_->rid();
         std::unique_ptr<RmRecord> rec;

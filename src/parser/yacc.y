@@ -33,7 +33,7 @@ WHERE UPDATE SET SELECT MAX MIN SUM COUNT AS INT CHAR FLOAT INDEX AND JOIN EXIT 
 %token <sv_bool> VALUE_BOOL
 
 // specify types for non-terminal symbol
-%type <sv_node> stmt dbStmt ddl dml txnStmt setStmt
+%type <sv_node> stmt dbStmt ddl dml txnStmt setStmt SelStmt
 %type <sv_field> field
 %type <sv_fields> fieldList
 %type <sv_type_len> type
@@ -161,7 +161,14 @@ dml:
     {
         $$ = std::make_shared<UpdateStmt>($2, $4, $5);
     }
-    |   SELECT selector FROM tableList opOnClause optWhereClause opt_order_clause opt_group_clause
+    |   SelStmt
+    {
+        $$ = $1;
+    }
+    ;
+
+SelStmt:
+        SELECT selector FROM tableList opOnClause optWhereClause opt_order_clause opt_group_clause
     {
         $$ = std::make_shared<SelectStmt>($2, $4, $5, $6, $7, $8);
     }
@@ -405,6 +412,10 @@ expr:
     |   col
     {
         $$ = std::static_pointer_cast<Expr>($1);
+    }
+    |   '(' SelStmt ')'
+    {
+        $$ = std::static_pointer_cast<Expr>($2);
     }
     ;
 

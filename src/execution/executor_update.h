@@ -57,6 +57,9 @@ class UpdateExecutor : public AbstractExecutor {
         }
     }
     std::unique_ptr<RmRecord> Next() override {
+        for(auto &cond : conds_) {
+            cond.init();
+        }
         // 先检查是否存在，存在则抛出异常
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
