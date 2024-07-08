@@ -24,7 +24,7 @@ using namespace ast;
 %token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER GROUP BY HAVING
 WHERE UPDATE SET SELECT MAX MIN SUM COUNT AS INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ORDER_BY ENABLE_NESTLOOP ENABLE_SORTMERGE ON
 // non-keywords
-%token LEQ NEQ GEQ T_EOF
+%token IN LEQ NEQ GEQ T_EOF
 
 // type-specific tokens
 %token <sv_str> IDENTIFIER VALUE_STRING
@@ -270,6 +270,10 @@ condition:
         col op expr
     {
         $$ = std::make_shared<BinaryExpr>($1, $2, $3);
+    }
+    |  col IN '(' SelStmt ')'
+    {
+        $$ = std::make_shared<BinaryExpr>($1, SV_OP_IN, std::static_pointer_cast<Expr>(std::make_shared<SubQueryStmt>(std::static_pointer_cast<SelectStmt>($4))));
     }
     ;
 

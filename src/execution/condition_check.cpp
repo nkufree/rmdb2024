@@ -5,36 +5,69 @@
 void ConditionCheck::execute_sub_query(Condition& cond)
 {
     if(!cond.is_rhs_select) return;
-    // TODO: 执行子查询
     std::shared_ptr<PortalStmt> portal = cond.rhs_portal;
     std::unique_ptr<AbstractExecutor> executeRoot = std::move(portal->root);
-    executeRoot->beginTuple();
-    auto Tuple = executeRoot->Next();
-    const std::vector<ColMeta>& cols = executeRoot->cols();
-    assert(cols.size() == 1);
-    const ColMeta& col = cols[0];
-    char *rec_buf = Tuple->data;
-    switch (col.type)
+    if(cond.op != CompOp::OP_IN)
     {
-    case ColType::TYPE_INT:
-        cond.rhs_val.set_int(*(int *)rec_buf);
-        break;
-    case ColType::TYPE_FLOAT:
-        cond.rhs_val.set_float(*(float *)rec_buf);
-        break;
-    case ColType::TYPE_STRING:
-        cond.rhs_val.set_str(std::string((char *)rec_buf, col.len));
-        break;
-    default:
-        break;
+        executeRoot->beginTuple();
+        auto Tuple = executeRoot->Next();
+        executeRoot->nextTuple();
+        if(!executeRoot->is_end())
+        {
+            throw InternalError("Subquery returns more than one row");
+        }
+        const std::vector<ColMeta>& cols = executeRoot->cols();
+        assert(cols.size() == 1);
+        const ColMeta& col = cols[0];
+        char *rec_buf = Tuple->data;
+        switch (col.type)
+        {
+        case ColType::TYPE_INT:
+            cond.rhs_val.set_int(*(int *)rec_buf);
+            break;
+        case ColType::TYPE_FLOAT:
+            cond.rhs_val.set_float(*(float *)rec_buf);
+            break;
+        case ColType::TYPE_STRING:
+            cond.rhs_val.set_str(std::string((char *)rec_buf, col.len));
+            break;
+        default:
+            break;
+        }
+        cond.is_rhs_select = false;
+        cond.is_rhs_val = true;
     }
-    cond.is_rhs_select = false;
-    cond.is_rhs_val = true;
+    else
+    {
+        for (executeRoot->beginTuple(); !executeRoot->is_end(); executeRoot->nextTuple()) {
+            auto Tuple = executeRoot->Next();
+            const std::vector<ColMeta>& cols = executeRoot->cols();
+            assert(cols.size() == 1);
+            const ColMeta& col = cols[0];
+            char *rec_buf = Tuple->data;
+            Value val;
+            switch (col.type)
+            {
+            case ColType::TYPE_INT:
+                val.set_int(*(int *)rec_buf);
+                break;
+            case ColType::TYPE_FLOAT:
+                val.set_float(*(float *)rec_buf);
+                break;
+            case ColType::TYPE_STRING:
+                val.set_str(std::string((char *)rec_buf, col.len));
+                break;
+            default:
+                break;
+            }
+            cond.rhs_set.insert(val);
+        }
+    }
 }
 
-bool ConditionCheck::check_conditions(const std::vector<Condition>& conds, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
+bool ConditionCheck::check_conditions(std::vector<Condition>& conds, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
 {
-    bool res = std::all_of(conds.begin(), conds.end(), [&](const Condition& cond) { return check_single_condition(cond, cols, rec); });
+    bool res = std::all_of(conds.begin(), conds.end(), [&](Condition& cond) { return check_single_condition(cond, cols, rec); });
     return res;
 }
 
@@ -59,18 +92,18 @@ static Value build_value(ColType col_type, int offset, const std::unique_ptr<RmR
     return val;
 }
 
-bool ConditionCheck::check_single_condition(const Condition& cond, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
+bool ConditionCheck::check_single_condition(Condition& cond, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
 {
     auto lhs_match_col = AbstractExecutor::get_col(cols, cond.lhs_col);
     Value lhs_val = build_value(lhs_match_col->type, lhs_match_col->offset, rec, lhs_match_col->len);
     Value rhs_val = cond.rhs_val;
-    if(!cond.is_rhs_val)
+    if(!cond.is_rhs_val && !cond.is_rhs_select)
     {
         auto rhs_match_col = AbstractExecutor::get_col(cols, cond.rhs_col);
         rhs_val = build_value(rhs_match_col->type, rhs_match_col->offset, rec, rhs_match_col->len);
     }
     // 2. 类型转换
-    if(lhs_val.type != rhs_val.type)
+    if(!cond.is_rhs_select && lhs_val.type != rhs_val.type)
     {
         if(lhs_val.type == ColType::TYPE_INT && rhs_val.type == ColType::TYPE_FLOAT)
         {
@@ -85,6 +118,17 @@ bool ConditionCheck::check_single_condition(const Condition& cond, const std::ve
         {
             throw IncompatibleTypeError(coltype2str(lhs_val.type), coltype2str(rhs_val.type));
         }
+    }
+    else if(cond.is_rhs_select && cond.rhs_set.size() > 0 && lhs_val.type != cond.rhs_set.begin()->type)
+    {
+        std::set<Value> new_set;
+        for(auto &val : cond.rhs_set)
+        {
+            Value new_val = val;
+            new_val.value_cast(lhs_val.type);
+            new_set.insert(new_val);
+        }
+        cond.rhs_set.swap(new_set);
     }
     // 3. 比较
     return cond.check_condition(lhs_val, rhs_val);
