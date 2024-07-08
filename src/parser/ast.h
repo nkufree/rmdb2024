@@ -266,6 +266,13 @@ struct SelectStmt : public TreeNode {
 };
 
 
+struct SubQueryStmt: public Expr {
+    std::shared_ptr<SelectStmt> subquery;
+
+    SubQueryStmt(std::shared_ptr<SelectStmt> subquery_) :
+            subquery(std::move(subquery_)) {}
+};
+
 // set enable_nestloop
 struct SetStmt : public TreeNode {
     SetKnobType set_knob_type_;

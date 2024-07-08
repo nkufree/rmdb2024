@@ -68,11 +68,6 @@ class Portal
             return std::make_shared<PortalStmt>(PORTAL_MULTI_QUERY, std::vector<TabCol>(), std::unique_ptr<AbstractExecutor>(),plan);
         } else if (auto x = std::dynamic_pointer_cast<DMLPlan>(plan)) {
             // 对于DML语句，需要对子查询进行处理
-            for(Condition& cond: x->conds_) {
-                if(cond.is_rhs_select) {
-                    cond.rhs_portal = start(cond.rhs_plan, context);
-                }
-            }
             switch(x->tag) {
                 case T_select:
                 {
@@ -162,10 +157,16 @@ class Portal
 
     std::unique_ptr<AbstractExecutor> convert_plan_executor(std::shared_ptr<Plan> plan, Context *context)
     {
+        
         if(auto x = std::dynamic_pointer_cast<ProjectionPlan>(plan)){
             return std::make_unique<ProjectionExecutor>(convert_plan_executor(x->subplan_, context), 
                                                         x->sel_cols_);
         } else if(auto x = std::dynamic_pointer_cast<ScanPlan>(plan)) {
+            for(Condition& cond: x->conds_) {
+                if(cond.is_rhs_select) {
+                    cond.rhs_portal = start(cond.rhs_plan, context);
+                }
+            }
             if(x->tag == T_SeqScan) {
                 return std::make_unique<SeqScanExecutor>(sm_manager_, x->tab_name_, x->conds_, context);
             }

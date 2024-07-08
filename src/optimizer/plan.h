@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "parser/ast.h"
 
 #include "parser/parser.h"
+#include "system/sm.h"
 
 typedef enum PlanTag{
     T_Invalid = 1,

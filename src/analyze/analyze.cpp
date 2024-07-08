@@ -200,10 +200,10 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 .aggr = rhs_col->aggr_type
             };
         }
-        else if(auto rhs_col = std::dynamic_pointer_cast<ast::SelectStmt>(expr->rhs)){
+        else if(auto rhs_col = std::dynamic_pointer_cast<ast::SubQueryStmt>(expr->rhs)){
             cond.is_rhs_val = false;
             cond.is_rhs_select = true;
-            cond.rhs_query = this->do_analyze(rhs_col);
+            cond.rhs_query = this->do_analyze(rhs_col->subquery);
         }
         conds.push_back(cond);
     }
@@ -259,12 +259,12 @@ void Analyze::check_clause(const std::vector<std::string> &tab_names, std::vecto
     // Get raw values in where clause
     for (auto &cond : conds) {
         // Infer table name from column name
-        if (!is_having && (cond.lhs_col.aggr != ast::NO_AGGR) || (!cond.is_rhs_val && cond.rhs_col.aggr != ast::NO_AGGR)) {
+        if (!is_having && (cond.lhs_col.aggr != ast::NO_AGGR) || (!cond.is_rhs_val && !cond.is_rhs_select && cond.rhs_col.aggr != ast::NO_AGGR)) {
             throw AmbiguousColumnError("aggregate functions are not allowed in WHERE clause");
         } 
 
         cond.lhs_col = check_column(all_cols, cond.lhs_col);
-        if (!cond.is_rhs_val) {
+        if (!cond.is_rhs_val && !cond.is_rhs_select) {
             cond.rhs_col = check_column(all_cols, cond.rhs_col);
         }
         if (cond.lhs_col.aggr == ast::AGGR_TYPE_COUNT && cond.lhs_col.col_name == "*") {

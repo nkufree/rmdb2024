@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
+#include "condition_check.h"
 
 class AggregationExecutor : public AbstractExecutor {
    private:
@@ -92,7 +93,7 @@ class AggregationExecutor : public AbstractExecutor {
 
     void beginTuple() override {
         for(auto &cond : having_conds_) {
-            cond.init();
+            ConditionCheck::execute_sub_query(cond);
         }
         for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
             auto record = prev_->Next();

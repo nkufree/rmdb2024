@@ -415,7 +415,7 @@ expr:
     }
     |   '(' SelStmt ')'
     {
-        $$ = std::static_pointer_cast<Expr>($2);
+        $$ = std::static_pointer_cast<Expr>(std::make_shared<SubQueryStmt>(std::static_pointer_cast<SelectStmt>($2)));
     }
     ;
 

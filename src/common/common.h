@@ -174,6 +174,12 @@ struct Value {
 
 enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE };
 
+class Query;
+class Plan;
+struct PortalStmt;
+class AbstractExecutor;
+struct ColMeta;
+
 struct Condition {
     TabCol lhs_col;   // left-hand side column
     CompOp op;        // comparison operator
@@ -198,12 +204,6 @@ struct Condition {
         default:
             throw InternalError("Unexpected comparison operator");
         }
-    }
-
-    void init() // 执行子查询
-    {
-        if(!is_rhs_select) return;
-        // TODO: 执行子查询
     }
 
     [[nodiscard]] bool eval_with_rvalue(const Value &lhs) const {
