@@ -335,13 +335,6 @@ std::shared_ptr<Plan> Planner::generate_select_plan(std::shared_ptr<Query> query
 std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context *context)
 {
     std::shared_ptr<Plan> plannerRoot;
-    for(auto& cond: query->conds)
-        {
-            if(cond.is_rhs_select)
-            {
-                cond.rhs_plan = do_planner(std::move(cond.rhs_query), context);
-            }
-        }
     if (auto x = std::dynamic_pointer_cast<ast::CreateTable>(query->parse)) {
         // create table;
         std::vector<ColDef> col_defs;

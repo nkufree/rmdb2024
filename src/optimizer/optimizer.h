@@ -34,12 +34,12 @@ class Optimizer {
     std::shared_ptr<Plan> plan_query(std::shared_ptr<Query> query, Context *context) {
         // 先解析query的条件，对子查询进行解析
         for(Condition& cond : query->conds) {
-            if(cond.is_rhs_select) {
+            if(cond.rhs_type == CondRhsType::RHS_SELECT) {
                 cond.rhs_plan = plan_query(cond.rhs_query, context);
             }
         }
         for(Condition& cond : query->having_conds) {
-            if(cond.is_rhs_select) {
+            if(cond.rhs_type == CondRhsType::RHS_SELECT) {
                 cond.rhs_plan = plan_query(cond.rhs_query, context);
             }
         }
