@@ -36,6 +36,7 @@ void ConditionCheck::execute_sub_query(Condition& cond)
         }
         cond.is_rhs_select = false;
         cond.is_rhs_val = true;
+        cond.rhs_type = CondRhsType::RHS_VALUE;
     }
     else
     {
@@ -62,6 +63,7 @@ void ConditionCheck::execute_sub_query(Condition& cond)
             }
             cond.rhs_set.insert(val);
         }
+        cond.rhs_type = CondRhsType::RHS_SET;
     }
 }
 
@@ -97,13 +99,13 @@ bool ConditionCheck::check_single_condition(Condition& cond, const std::vector<C
     auto lhs_match_col = AbstractExecutor::get_col(cols, cond.lhs_col);
     Value lhs_val = build_value(lhs_match_col->type, lhs_match_col->offset, rec, lhs_match_col->len);
     Value rhs_val = cond.rhs_val;
-    if(!cond.is_rhs_val && !cond.is_rhs_select)
+    if(cond.rhs_type == CondRhsType::RHS_COL)
     {
         auto rhs_match_col = AbstractExecutor::get_col(cols, cond.rhs_col);
         rhs_val = build_value(rhs_match_col->type, rhs_match_col->offset, rec, rhs_match_col->len);
     }
     // 2. 类型转换
-    if(!cond.is_rhs_select && lhs_val.type != rhs_val.type)
+    if(cond.rhs_type == CondRhsType::RHS_VALUE && lhs_val.type != rhs_val.type)
     {
         if(lhs_val.type == ColType::TYPE_INT && rhs_val.type == ColType::TYPE_FLOAT)
         {
@@ -119,7 +121,7 @@ bool ConditionCheck::check_single_condition(Condition& cond, const std::vector<C
             throw IncompatibleTypeError(coltype2str(lhs_val.type), coltype2str(rhs_val.type));
         }
     }
-    else if(cond.is_rhs_select && cond.rhs_set.size() > 0 && lhs_val.type != cond.rhs_set.begin()->type)
+    else if(cond.rhs_type == CondRhsType::RHS_SET && cond.rhs_set.size() > 0 && lhs_val.type != cond.rhs_set.begin()->type)
     {
         std::set<Value> new_set;
         for(auto &val : cond.rhs_set)

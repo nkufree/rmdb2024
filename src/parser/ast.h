@@ -157,6 +157,12 @@ struct BoolLit : public Value {
     BoolLit(bool val_) : val(val_) {}
 };
 
+struct ValueList : public Expr {
+    std::vector<std::shared_ptr<Value>> vals;
+
+    ValueList(std::vector<std::shared_ptr<Value>> vals_) : vals(std::move(vals_)) {}
+};
+
 struct Col : public Expr {
     std::string tab_name;
     std::string col_name;

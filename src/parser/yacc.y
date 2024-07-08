@@ -275,6 +275,10 @@ condition:
     {
         $$ = std::make_shared<BinaryExpr>($1, SV_OP_IN, std::static_pointer_cast<Expr>(std::make_shared<SubQueryStmt>(std::static_pointer_cast<SelectStmt>($4))));
     }
+    | col IN '(' valueList ')'
+    {
+        $$ = std::make_shared<BinaryExpr>($1, SV_OP_IN, std::static_pointer_cast<Expr>(std::make_shared<ValueList>($4)));
+    }
     ;
 
 

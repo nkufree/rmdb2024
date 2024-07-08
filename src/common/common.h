@@ -181,6 +181,13 @@ struct PortalStmt;
 class AbstractExecutor;
 struct ColMeta;
 
+enum CondRhsType {
+    RHS_VALUE,
+    RHS_COL,
+    RHS_SELECT,
+    RHS_SET
+};
+
 struct Condition {
     TabCol lhs_col;   // left-hand side column
     CompOp op;        // comparison operator
@@ -192,6 +199,7 @@ struct Condition {
     std::shared_ptr<Plan> rhs_plan;
     std::shared_ptr<PortalStmt> rhs_portal;
     std::set<Value> rhs_set;
+    CondRhsType rhs_type;
 
     bool check_condition(const Value& lhs, const Value& rhs) const {
 

@@ -188,6 +188,7 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
         if (auto rhs_val = std::dynamic_pointer_cast<ast::Value>(expr->rhs)) {
             cond.is_rhs_val = true;
             cond.is_rhs_select = false;
+            cond.rhs_type = CondRhsType::RHS_VALUE;
             cond.rhs_val = convert_sv_value(rhs_val);
         } else if (auto rhs_col = std::dynamic_pointer_cast<ast::Col>(expr->rhs)) {
             cond.is_rhs_val = false;
@@ -198,11 +199,24 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 .alias = rhs_col->alias,
                 .aggr = rhs_col->aggr_type
             };
+            cond.rhs_type = CondRhsType::RHS_COL;
         }
         else if(auto rhs_col = std::dynamic_pointer_cast<ast::SubQueryStmt>(expr->rhs)){
             cond.is_rhs_val = false;
             cond.is_rhs_select = true;
             cond.rhs_query = this->do_analyze(rhs_col->subquery);
+            cond.rhs_type = CondRhsType::RHS_SELECT;
+        }
+        else if(auto rhs_col = std::dynamic_pointer_cast<ast::ValueList>(expr->rhs)){
+            cond.is_rhs_val = false;
+            cond.is_rhs_select = false;
+            for(auto& val: rhs_col->vals){
+                cond.rhs_set.insert(convert_sv_value(val));
+            }
+            cond.rhs_type = CondRhsType::RHS_SET;
+        }
+        else {
+            throw InternalError("Unexpected rhs type");
         }
         conds.push_back(cond);
     }
@@ -258,12 +272,12 @@ void Analyze::check_clause(const std::vector<std::string> &tab_names, std::vecto
     // Get raw values in where clause
     for (auto &cond : conds) {
         // Infer table name from column name
-        if (!is_having && (cond.lhs_col.aggr != ast::NO_AGGR) || (!cond.is_rhs_val && !cond.is_rhs_select && cond.rhs_col.aggr != ast::NO_AGGR)) {
+        if (!is_having && (cond.lhs_col.aggr != ast::NO_AGGR) || (cond.rhs_type == CondRhsType::RHS_COL && cond.rhs_col.aggr != ast::NO_AGGR)) {
             throw AmbiguousColumnError("aggregate functions are not allowed in WHERE clause");
         } 
 
         cond.lhs_col = check_column(all_cols, cond.lhs_col);
-        if (!cond.is_rhs_val && !cond.is_rhs_select) {
+        if (cond.rhs_type == CondRhsType::RHS_COL) {
             cond.rhs_col = check_column(all_cols, cond.rhs_col);
         }
         if (cond.lhs_col.aggr == ast::AGGR_TYPE_COUNT && cond.lhs_col.col_name == "*") {
@@ -284,15 +298,15 @@ void Analyze::check_clause(const std::vector<std::string> &tab_names, std::vecto
             auto lhs_col = lhs_tab.get_col(cond.lhs_col.col_name);
             ColType lhs_type = lhs_col->type;
             ColType rhs_type;
-            if (cond.is_rhs_val) {
+            if (cond.rhs_type == CondRhsType::RHS_VALUE)  {
                 cond.rhs_val.init_raw(lhs_col->len);
                 rhs_type = cond.rhs_val.type;
-            } else if(!cond.is_rhs_select){
+            } else if(cond.rhs_type == CondRhsType::RHS_COL){
                 TabMeta &rhs_tab = sm_manager_->db_.get_table(cond.rhs_col.tab_name);
                 auto rhs_col = rhs_tab.get_col(cond.rhs_col.col_name);
                 rhs_type = rhs_col->type;
             }
-            else {// select
+            else if(cond.rhs_type == CondRhsType::RHS_SELECT){// select
                 //TODO: 检查select语句是否合法
                 auto query = cond.rhs_query;
                 if(query->group_cols.size() > 0){
@@ -302,7 +316,7 @@ void Analyze::check_clause(const std::vector<std::string> &tab_names, std::vecto
                     throw AmbiguousColumnError("subquery must return only one column");
                 }
             }
-            if (!cond.is_rhs_select && !value_type_match(lhs_type, rhs_type)) {
+            if ((cond.rhs_type == CondRhsType::RHS_COL || cond.rhs_type == CondRhsType::RHS_VALUE) && !value_type_match(lhs_type, rhs_type)) {
                 throw IncompatibleTypeError(coltype2str(lhs_type), coltype2str(rhs_type));
             }
         }
