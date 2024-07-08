@@ -191,6 +191,7 @@ enum CondRhsType {
 struct Condition {
     TabCol lhs_col;   // left-hand side column
     CompOp op;        // comparison operator
+    // TODO:下面这两个bool变量应该删除，用rhs_type代替
     bool is_rhs_val;  // true if right-hand side is a value (not a column)
     bool is_rhs_select; // true if right-hand side is a select statement
     TabCol rhs_col;   // right-hand side column
