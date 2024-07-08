@@ -335,6 +335,13 @@ std::shared_ptr<Plan> Planner::generate_select_plan(std::shared_ptr<Query> query
 std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context *context)
 {
     std::shared_ptr<Plan> plannerRoot;
+    for(auto& cond: query->conds)
+        {
+            if(cond.is_rhs_select)
+            {
+                cond.rhs_plan = do_planner(std::move(cond.rhs_query), context);
+            }
+        }
     if (auto x = std::dynamic_pointer_cast<ast::CreateTable>(query->parse)) {
         // create table;
         std::vector<ColDef> col_defs;
@@ -405,14 +412,6 @@ std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context 
     } else if (auto x = std::dynamic_pointer_cast<ast::SelectStmt>(query->parse)) {
 
         std::shared_ptr<plannerInfo> root = std::make_shared<plannerInfo>(x);
-        // 生成子查询的查询计划
-        for(auto& cond: query->conds)
-        {
-            if(cond.is_rhs_select)
-            {
-                cond.rhs_plan = do_planner(std::move(cond.rhs_query), context);
-            }
-        }
         // 生成select语句的查询执行计划
         std::shared_ptr<Plan> projection = generate_select_plan(std::move(query), context);
         plannerRoot = std::make_shared<DMLPlan>(T_select, projection, std::string(), std::vector<std::vector<Value>>(),

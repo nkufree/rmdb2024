@@ -117,7 +117,6 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         }
         get_clause(x->conds, query->conds);
         check_clause({x->tab_name}, query->conds, false); 
-        check_fix_clause(query->tables.at(0), query->set_clauses);
     } else if (auto x = std::dynamic_pointer_cast<ast::DeleteStmt>(parse)) {
         //处理where条件
         get_clause(x->conds, query->conds);
