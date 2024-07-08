@@ -32,12 +32,16 @@ class DeleteExecutor : public AbstractExecutor {
         tab_name_ = tab_name;
         tab_ = sm_manager_->db_.get_table(tab_name);
         fh_ = sm_manager_->fhs_.at(tab_name).get();
-        conds_ = conds;
+        // conds_ = conds;
+        conds_ = std::vector<Condition>();
         rids_ = rids;
         context_ = context;
     }
 
     std::unique_ptr<RmRecord> Next() override {
+        // for(auto &cond : conds_) {
+        //     ConditionCheck::execute_sub_query(cond);
+        // }
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);

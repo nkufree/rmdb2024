@@ -34,7 +34,8 @@ class UpdateExecutor : public AbstractExecutor {
         set_clauses_ = set_clauses;
         tab_ = sm_manager_->db_.get_table(tab_name);
         fh_ = sm_manager_->fhs_.at(tab_name).get();
-        conds_ = conds;
+        // conds_ = conds;
+        conds_ = std::vector<Condition>();
         rids_ = rids;
         context_ = context;
         for(size_t i = 0; i < set_clauses_.size(); i++) {
@@ -57,6 +58,9 @@ class UpdateExecutor : public AbstractExecutor {
         }
     }
     std::unique_ptr<RmRecord> Next() override {
+        // for(auto &cond : conds_) {
+        //     ConditionCheck::execute_sub_query(cond);
+        // }
         // 先检查是否存在，存在则抛出异常
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);

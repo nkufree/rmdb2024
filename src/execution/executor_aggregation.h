@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
+#include "condition_check.h"
 
 class AggregationExecutor : public AbstractExecutor {
    private:
@@ -91,6 +92,9 @@ class AggregationExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
+        for(auto &cond : having_conds_) {
+            ConditionCheck::execute_sub_query(cond);
+        }
         for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
             auto record = prev_->Next();
             store_group(std::move(record));
@@ -179,7 +183,7 @@ class AggregationExecutor : public AbstractExecutor {
 
     Value aggregate_value(ColMeta sel_col) {
         Value val;
-        if (curr_records.empty() && sel_col.aggr != ast::AGGR_TYPE_COUNT) {
+        if (curr_records.empty() && sel_col.aggr != ast::AGGR_TYPE_COUNT && sel_col.aggr != ast::AGGR_TYPE_SUM) {
             val.type = sel_col.type;
             val.init_raw(sel_col.len);
             val.type = TYPE_NULL;

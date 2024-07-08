@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "defs.h"
 #include "record/rm_defs.h"
 #include "parser/ast.h"
+#include <set>
 
 
 struct TabCol {
@@ -172,14 +173,34 @@ struct Value {
     bool operator>=(const Value &rhs) const { return !(*this < rhs); }
 };
 
-enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE };
+enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE, OP_IN };
+
+class Query;
+class Plan;
+struct PortalStmt;
+class AbstractExecutor;
+struct ColMeta;
+
+enum CondRhsType {
+    RHS_VALUE,
+    RHS_COL,
+    RHS_SELECT,
+    RHS_SET
+};
 
 struct Condition {
     TabCol lhs_col;   // left-hand side column
     CompOp op;        // comparison operator
+    // TODO:下面这两个bool变量应该删除，用rhs_type代替
     bool is_rhs_val;  // true if right-hand side is a value (not a column)
+    bool is_rhs_select; // true if right-hand side is a select statement
     TabCol rhs_col;   // right-hand side column
     Value rhs_val;    // right-hand side value
+    std::shared_ptr<Query> rhs_query;
+    std::shared_ptr<Plan> rhs_plan;
+    std::shared_ptr<PortalStmt> rhs_portal;
+    std::set<Value> rhs_set;
+    CondRhsType rhs_type;
 
     bool check_condition(const Value& lhs, const Value& rhs) const {
 
@@ -191,6 +212,7 @@ struct Condition {
         case OP_GT: return lhs > rhs;
         case OP_LE: return lhs <= rhs;
         case OP_GE: return lhs >= rhs;
+        case OP_IN: return rhs_set.find(lhs) != rhs_set.end();
         default:
             throw InternalError("Unexpected comparison operator");
         }

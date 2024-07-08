@@ -58,6 +58,7 @@ private:
                 {SV_OP_GT, ">"},
                 {SV_OP_LE, "<="},
                 {SV_OP_GE, ">="},
+                {SV_OP_IN, "IN"}
         };
         return m.at(op);
     }

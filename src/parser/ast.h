@@ -23,7 +23,7 @@ enum SvType {
 };
 
 enum SvCompOp {
-    SV_OP_EQ, SV_OP_NE, SV_OP_LT, SV_OP_GT, SV_OP_LE, SV_OP_GE
+    SV_OP_EQ, SV_OP_NE, SV_OP_LT, SV_OP_GT, SV_OP_LE, SV_OP_GE, SV_OP_IN
 };
 
 enum OrderByDir {
@@ -157,6 +157,12 @@ struct BoolLit : public Value {
     BoolLit(bool val_) : val(val_) {}
 };
 
+struct ValueList : public Expr {
+    std::vector<std::shared_ptr<Value>> vals;
+
+    ValueList(std::vector<std::shared_ptr<Value>> vals_) : vals(std::move(vals_)) {}
+};
+
 struct Col : public Expr {
     std::string tab_name;
     std::string col_name;
@@ -265,6 +271,13 @@ struct SelectStmt : public TreeNode {
             group(std::move(group_)), order(std::move(order_)) {has_sort = (bool)order;}
 };
 
+
+struct SubQueryStmt: public Expr {
+    std::shared_ptr<SelectStmt> subquery;
+
+    SubQueryStmt(std::shared_ptr<SelectStmt> subquery_) :
+            subquery(std::move(subquery_)) {}
+};
 
 // set enable_nestloop
 struct SetStmt : public TreeNode {
