@@ -51,7 +51,7 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 3. 释放事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-
+    txn->set_state(TransactionState::COMMITTED);
 }
 
 /**
@@ -66,5 +66,78 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 3. 清空事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    
+
+    auto write_set = txn->get_write_set();
+    while (write_set->size() > 0)
+    {
+        WriteRecord *write_record = write_set->back();
+        write_set->pop_back();
+        std::string tab_name = write_record->GetTableName();
+        TabMeta& tab = sm_manager_->db_.get_table(tab_name);
+        RmFileHandle *fh_ = sm_manager_->fhs_.at(tab_name).get();
+        WType type = write_record->GetWriteType();
+        Rid insert_id;
+        if(type == WType::DELETE_TUPLE)
+        {
+            insert_id = fh_->insert_record(write_record->GetRecord().data, nullptr);
+        }
+        // 修改索引
+        for (auto &index : tab.indexes)
+        {
+            auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name, index.cols)).get();
+            char *key = new char[tab.get_col_total_len()];
+            int offset = 0;
+            char* record = write_record->GetRecord().data;
+            std::unique_ptr<RmRecord> rec;
+            if(type == WType::INSERT_TUPLE) {
+                rec = fh_->get_record(write_record->GetRid(), nullptr);
+                record = rec->data;
+            }
+            for (size_t j = 0; j < (size_t)index.col_num; ++j)
+            {
+                memcpy(key + offset, record + index.cols[j].offset, index.cols[j].len);
+                offset += index.cols[j].len;
+            }
+            std::unique_ptr<RmRecord> old_rec;
+            char* old_key = new char[tab.get_col_total_len()];
+            switch (type)
+            {
+            case WType::INSERT_TUPLE:
+                ih->delete_entry(key, txn);
+                break;
+            case WType::DELETE_TUPLE:
+                ih->insert_entry(key, insert_id, txn);
+                break;
+            case WType::UPDATE_TUPLE:
+                ih->delete_entry(key, txn);
+                old_rec = fh_->get_record(write_record->GetRid(), nullptr);
+                
+                offset = 0;
+                for (size_t j = 0; j < (size_t)index.col_num; ++j)
+                {
+                    memcpy(old_key + offset, old_rec->data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                ih->insert_entry(old_key, write_record->GetRid(), txn);
+                break;
+            default:
+                break;
+            }
+            delete old_key;
+            delete[] key;
+        }
+        // 修改表中的数据
+        switch (type)
+        {
+        case WType::INSERT_TUPLE:
+            fh_->delete_record(write_record->GetRid(), nullptr);
+            break;
+        case WType::UPDATE_TUPLE:
+            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, nullptr);
+            break;
+        default:
+            break;
+        }
+    }
+    txn->set_state(TransactionState::ABORTED);
 }

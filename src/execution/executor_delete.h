@@ -51,6 +51,8 @@ class DeleteExecutor : public AbstractExecutor {
             if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
                 continue;
             fh_->delete_record(rid, context_);
+            WriteRecord* wr = new WriteRecord(WType::DELETE_TUPLE, tab_name_, rid, *rec.get());
+            context_->txn_->append_write_record(wr);
             for(size_t i = 0; i < tab_.indexes.size(); ++i) {
                 auto& index = tab_.indexes[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
