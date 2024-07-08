@@ -76,10 +76,9 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         TabMeta& tab = sm_manager_->db_.get_table(tab_name);
         RmFileHandle *fh_ = sm_manager_->fhs_.at(tab_name).get();
         WType type = write_record->GetWriteType();
-        Rid insert_id;
         if(type == WType::DELETE_TUPLE)
         {
-            insert_id = fh_->insert_record(write_record->GetRecord().data, nullptr);
+            fh_->insert_record(write_record->GetRid(), write_record->GetRecord().data);
         }
         // 修改索引
         for (auto &index : tab.indexes)
@@ -89,7 +88,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
             int offset = 0;
             char* record = write_record->GetRecord().data;
             std::unique_ptr<RmRecord> rec;
-            if(type == WType::INSERT_TUPLE) {
+            if(type == WType::INSERT_TUPLE || type == WType::UPDATE_TUPLE) {
                 rec = fh_->get_record(write_record->GetRid(), nullptr);
                 record = rec->data;
             }
@@ -98,7 +97,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
                 memcpy(key + offset, record + index.cols[j].offset, index.cols[j].len);
                 offset += index.cols[j].len;
             }
-            std::unique_ptr<RmRecord> old_rec;
+            char* old_rec;
             char* old_key = new char[tab.get_col_total_len()];
             switch (type)
             {
@@ -106,16 +105,15 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
                 ih->delete_entry(key, txn);
                 break;
             case WType::DELETE_TUPLE:
-                ih->insert_entry(key, insert_id, txn);
+                ih->insert_entry(key, write_record->GetRid(), txn);
                 break;
             case WType::UPDATE_TUPLE:
                 ih->delete_entry(key, txn);
-                old_rec = fh_->get_record(write_record->GetRid(), nullptr);
-                
+                old_rec = write_record->GetRecord().data;
                 offset = 0;
                 for (size_t j = 0; j < (size_t)index.col_num; ++j)
                 {
-                    memcpy(old_key + offset, old_rec->data + index.cols[j].offset, index.cols[j].len);
+                    memcpy(old_key + offset, old_rec + index.cols[j].offset, index.cols[j].len);
                     offset += index.cols[j].len;
                 }
                 ih->insert_entry(old_key, write_record->GetRid(), txn);
