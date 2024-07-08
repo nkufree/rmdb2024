@@ -108,6 +108,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 ">=" { return GEQ; }
 "<=" { return LEQ; }
 "<>" { return NEQ; }
+"!=" { return NEQ; }
 {single_op} { return yytext[0]; }
     /* id */
 {identifier} {
