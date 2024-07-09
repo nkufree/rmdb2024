@@ -122,11 +122,6 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
             {
                 context->txn_ = txn_mgr_->get_transaction(*txn_id);
                 txn_mgr_->abort(context->txn_, context->log_mgr_);
-                std::string str = "abort\n";
-                std::fstream outfile;
-                outfile.open("output.txt", std::ios::out | std::ios::app);
-                outfile << str;
-                outfile.close();
                 break;
             }     
             default:

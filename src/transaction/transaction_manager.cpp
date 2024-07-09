@@ -36,6 +36,7 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     res->set_start_ts(next_timestamp_);
     next_txn_id_++;
     next_timestamp_++;
+    res->set_state(TransactionState::DEFAULT);
     return res;
 }
 
@@ -51,6 +52,8 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 3. 释放事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
+    std::scoped_lock lock(latch_);
+    txn->get_write_set()->clear();
     txn->set_state(TransactionState::COMMITTED);
 }
 
@@ -66,9 +69,11 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 3. 清空事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
+    std::scoped_lock lock(latch_);
 
+    Context context(lock_manager_, log_manager, txn);
     auto write_set = txn->get_write_set();
-    while (write_set->size() > 0)
+    while (!write_set->empty())
     {
         WriteRecord *write_record = write_set->back();
         write_set->pop_back();
@@ -128,14 +133,15 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         switch (type)
         {
         case WType::INSERT_TUPLE:
-            fh_->delete_record(write_record->GetRid(), nullptr);
+            fh_->delete_record(write_record->GetRid(), &context);
             break;
         case WType::UPDATE_TUPLE:
-            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, nullptr);
+            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, &context);
             break;
         default:
             break;
         }
+        delete write_record;
     }
     txn->set_state(TransactionState::ABORTED);
 }

@@ -92,7 +92,7 @@ class UpdateExecutor : public AbstractExecutor {
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
-            WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec.get());
+            WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec);
             context_->txn_->append_write_record(wr);
             std::unique_ptr<RmRecord> rec_new(new RmRecord(*rec));
             for (size_t i = 0; i < set_clauses_.size(); i++) {
