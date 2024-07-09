@@ -72,7 +72,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     {
         WriteRecord *write_record = write_set->back();
         write_set->pop_back();
-        std::string tab_name = write_record->GetTableName();
+        std::string& tab_name = write_record->GetTableName();
         TabMeta& tab = sm_manager_->db_.get_table(tab_name);
         RmFileHandle *fh_ = sm_manager_->fhs_.at(tab_name).get();
         WType type = write_record->GetWriteType();
