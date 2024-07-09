@@ -77,6 +77,9 @@ class AggregationExecutor : public AbstractExecutor {
         len_ = offset;
         
         having_conds_ = having_conds;
+        for(auto &cond : having_conds_) {
+            ConditionCheck::execute_sub_query(cond);
+        }
     }
 
     void store_group(std::unique_ptr<RmRecord> record) {
@@ -92,9 +95,6 @@ class AggregationExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-        for(auto &cond : having_conds_) {
-            ConditionCheck::execute_sub_query(cond);
-        }
         for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
             auto record = prev_->Next();
             store_group(std::move(record));

@@ -45,12 +45,12 @@ class SeqScanExecutor : public AbstractExecutor {
         context_ = context;
 
         fed_conds_ = conds_;
-    }
-
-    void beginTuple() override {
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
         }
+    }
+
+    void beginTuple() override {
         scan_ = std::make_unique<RmScan>(fh_);
         // rid_ = scan_->rid();
         std::unique_ptr<RmRecord> rec;

@@ -130,12 +130,12 @@ class IndexScanExecutor : public AbstractExecutor {
                 fed_conds_.push_back(conds_[i]);
             }
         }
-    }
-
-    void beginTuple() override {
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
         }
+    }
+
+    void beginTuple() override {
         // std::cout << "use index" << std::endl;
         IxIndexHandle* ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_)).get();
         // ih->print_tree();
