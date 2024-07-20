@@ -170,11 +170,7 @@ struct TabMeta {
     }
 
     int get_col_total_len() {
-        int total_len = 0;
-        for(auto& col: cols) {
-            total_len += col.len;
-        }
-        return total_len;
+        return cols.back().offset + cols.back().len;
     }
 
     // 匹配索引，查找最长匹配的索引

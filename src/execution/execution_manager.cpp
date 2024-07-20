@@ -171,7 +171,11 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     
     // Print records
     size_t num_rec = 0;
-    bool is_first = true;
+    outfile << "|";
+    for(int i = 0; i < (int)captions.size(); ++i) {
+        outfile << " " << captions[i] << " |";
+    }
+    outfile << "\n";
     // 执行query_plan
     for (executorTreeRoot->beginTuple(); !executorTreeRoot->is_end(); executorTreeRoot->nextTuple()) {
         auto Tuple = executorTreeRoot->Next();
@@ -195,14 +199,6 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
         // print record into buffer
         rec_printer.print_record(columns, context);
         // print record into file
-        if(is_first) {
-            outfile << "|";
-            for(int i = 0; i < (int)captions.size(); ++i) {
-                outfile << " " << captions[i] << " |";
-            }
-            outfile << "\n";
-            is_first = false;
-        }
         outfile << "|";
         for(int i = 0; i < (int)columns.size(); ++i) {
             outfile << " " << columns[i] << " |";

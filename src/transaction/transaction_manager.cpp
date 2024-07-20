@@ -36,6 +36,7 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     res->set_start_ts(next_timestamp_);
     next_txn_id_++;
     next_timestamp_++;
+    res->set_state(TransactionState::DEFAULT);
     return res;
 }
 
@@ -51,7 +52,9 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 3. 释放事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-
+    std::scoped_lock lock(latch_);
+    txn->get_write_set()->clear();
+    txn->set_state(TransactionState::COMMITTED);
 }
 
 /**
@@ -66,5 +69,79 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 3. 清空事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    
+    std::scoped_lock lock(latch_);
+
+    Context context(lock_manager_, log_manager, txn);
+    auto write_set = txn->get_write_set();
+    while (!write_set->empty())
+    {
+        WriteRecord *write_record = write_set->back();
+        write_set->pop_back();
+        std::string& tab_name = write_record->GetTableName();
+        TabMeta& tab = sm_manager_->db_.get_table(tab_name);
+        RmFileHandle *fh_ = sm_manager_->fhs_.at(tab_name).get();
+        WType type = write_record->GetWriteType();
+        if(type == WType::DELETE_TUPLE)
+        {
+            fh_->insert_record(write_record->GetRid(), write_record->GetRecord().data);
+        }
+        // 修改索引
+        for (auto &index : tab.indexes)
+        {
+            auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name, index.cols)).get();
+            char *key = new char[tab.get_col_total_len()];
+            int offset = 0;
+            char* record = write_record->GetRecord().data;
+            std::unique_ptr<RmRecord> rec;
+            if(type == WType::INSERT_TUPLE || type == WType::UPDATE_TUPLE) {
+                rec = fh_->get_record(write_record->GetRid(), nullptr);
+                record = rec->data;
+            }
+            for (size_t j = 0; j < (size_t)index.col_num; ++j)
+            {
+                memcpy(key + offset, record + index.cols[j].offset, index.cols[j].len);
+                offset += index.cols[j].len;
+            }
+            char* old_rec;
+            char* old_key = new char[tab.get_col_total_len()];
+            switch (type)
+            {
+            case WType::INSERT_TUPLE:
+                ih->delete_entry(key, txn);
+                break;
+            case WType::DELETE_TUPLE:
+                ih->insert_entry(key, write_record->GetRid(), txn);
+                break;
+            case WType::UPDATE_TUPLE:
+                ih->delete_entry(key, txn);
+                old_rec = write_record->GetRecord().data;
+                offset = 0;
+                for (size_t j = 0; j < (size_t)index.col_num; ++j)
+                {
+                    memcpy(old_key + offset, old_rec + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                ih->insert_entry(old_key, write_record->GetRid(), txn);
+                break;
+            default:
+                break;
+            }
+            delete old_key;
+            delete[] key;
+        }
+        // 修改表中的数据
+        switch (type)
+        {
+        case WType::INSERT_TUPLE:
+            fh_->delete_record(write_record->GetRid(), &context);
+            break;
+        case WType::UPDATE_TUPLE:
+            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, &context);
+            break;
+        default:
+            break;
+        }
+        delete write_record;
+    }
+    txn->set_state(TransactionState::ABORTED);
 }

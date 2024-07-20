@@ -78,7 +78,6 @@ void RmFileHandle::insert_record(const Rid& rid, char* buf) {
         file_hdr_.first_free_page_no = page_handle.page_hdr->next_free_page_no;
         page_handle.page_hdr->next_free_page_no = RM_NO_PAGE;
     }
-    Bitmap::set(page_handle.bitmap, rid.slot_no);
     buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
 }
 
