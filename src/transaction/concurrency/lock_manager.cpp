@@ -141,10 +141,16 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd) {
     if(lock_request->lock_mode_ == LockMode::EXLUCSIVE)
         return true;
     lock_request->lock_mode_ = LockMode::EXLUCSIVE;
-    lock_request->granted_ = false;
-    lock_request_queue->cv_.wait(queue_lock, [&](){
-        return lock_request->granted_;
-    });
+    if(lock_request_queue->request_queue_.size() == 1) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::X;
+        lock_request->granted_ = true;
+    }
+    else {
+        lock_request->granted_ = false;
+        lock_request_queue->cv_.wait(queue_lock, [&](){
+            return lock_request->granted_;
+        });
+    }
     return true;
 }
 
