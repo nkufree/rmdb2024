@@ -41,6 +41,7 @@ class InsertExecutor : public AbstractExecutor {
     };
 
     std::unique_ptr<RmRecord> Next() override {
+        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, fh_->GetFd());
         // Make record buffer
         RmRecord rec(fh_->get_file_hdr().record_size);
         char* key = new char[tab_.get_col_total_len()];
