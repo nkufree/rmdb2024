@@ -57,7 +57,8 @@ class SeqScanExecutor : public AbstractExecutor {
             int table_fd = fh_->GetFd();
             if(read_only_) {
                 if(lock_set->find(LockDataId(table_fd, LockDataType::TABLE)) == lock_set->end())
-                    context_->lock_mgr_->lock_shared_on_table(context_->txn_, table_fd);
+                    // context_->lock_mgr_->lock_shared_on_table(context_->txn_, table_fd);
+                    context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, table_fd);
             } else {
                 context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, table_fd);
             }
