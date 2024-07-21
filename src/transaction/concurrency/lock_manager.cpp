@@ -11,6 +11,17 @@ See the Mulan PSL v2 for more details. */
 #include "lock_manager.h"
 #include <algorithm>
 
+
+inline void LockManager::check_wait_die(const std::shared_ptr<LockRequestQueue>& lock_request_queue, Transaction* txn) {
+    bool wait_die = std::any_of(lock_request_queue->request_queue_.begin(), lock_request_queue->request_queue_.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
+        return lock_request->txn_id_ < txn->get_transaction_id();
+    });
+    if(wait_die)
+    {
+        throw TransactionAbortException(txn->get_transaction_id(), AbortReason::DEADLOCK_PREVENTION);
+    }
+}
+
 /**
  * @description: 申请行级共享锁
  * @return {bool} 加锁是否成功
@@ -59,13 +70,7 @@ bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
     // 检查是否有事务已经持有排他锁
     // 如果有事务持有排他锁，加入等待队列，等待条件变量唤醒
     if(lock_request_queue->group_lock_mode_ == GroupLockMode::X) {
-        bool wait_die = std::any_of(lock_request_queue->request_queue_.begin(), lock_request_queue->request_queue_.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
-            return lock_request->txn_id_ < txn->get_transaction_id();
-        });
-        if(wait_die)
-        {
-            throw TransactionAbortException(txn->get_transaction_id(), AbortReason::DEADLOCK_PREVENTION);
-        }
+        check_wait_die(lock_request_queue, txn);
         lock_request_queue->request_queue_.emplace_back(lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return lock_request->granted_;
@@ -88,6 +93,8 @@ bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
  * @param {int} tab_fd 目标表的fd
  */
 bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
+    if(txn->get_lock_set()->find(LockDataId(tab_fd, LockDataType::TABLE)) != txn->get_lock_set()->end())
+        return upgrade_lock_on_table(txn, tab_fd);
     std::cout << "txn " << txn->get_transaction_id() << " lock_exclusive_on_table " << tab_fd << std::endl;
     const LockDataId lock_data_id = LockDataId(tab_fd, LockDataType::TABLE);
     std::shared_ptr<LockRequestQueue> lock_request_queue;
@@ -104,13 +111,7 @@ bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
     if(lock_request_queue->group_lock_mode_ != GroupLockMode::NON_LOCK) {
         // wait-die
-        bool wait_die = std::any_of(lock_request_queue->request_queue_.begin(), lock_request_queue->request_queue_.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
-            return lock_request->txn_id_ < txn->get_transaction_id();
-        });
-        if(wait_die)
-        {
-            throw TransactionAbortException(txn->get_transaction_id(), AbortReason::DEADLOCK_PREVENTION);
-        }
+        check_wait_die(lock_request_queue, txn);
         lock_request_queue->request_queue_.emplace_back(lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return lock_request->granted_;
@@ -123,6 +124,29 @@ bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
         lock_request_queue->group_lock_mode_ = GroupLockMode::X;
     }
     txn->get_lock_set()->insert(lock_data_id);
+    return true;
+}
+
+bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd) {
+    const LockDataId lock_data_id = LockDataId(tab_fd, LockDataType::TABLE);
+    std::shared_ptr<LockRequestQueue> lock_request_queue = lock_table_[lock_data_id];
+    std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
+    std::shared_ptr<LockRequest> lock_request;
+    for(auto& tmp : lock_request_queue->request_queue_) {
+        if(tmp->txn_id_ == txn->get_transaction_id()) {
+            if(lock_request->lock_mode_ == LockMode::SHARED) {
+                lock_request = tmp;
+                break;
+            }
+        }
+    }
+    if(lock_request->lock_mode_ == LockMode::EXLUCSIVE)
+        return true;
+    lock_request->lock_mode_ = LockMode::EXLUCSIVE;
+    lock_request->granted_ = false;
+    lock_request_queue->cv_.wait(queue_lock, [&](){
+        return lock_request->granted_;
+    });
     return true;
 }
 
@@ -165,9 +189,9 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
     }
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
     auto& request_queue = lock_request_queue->request_queue_;
-    for(auto it = request_queue.begin(); it != request_queue.end(); it++) {
+    for(auto it = request_queue.begin(); it != request_queue.end();it++) {
         if((*it)->txn_id_ == txn->get_transaction_id()) {
-            request_queue.erase(it);
+            it = request_queue.erase(it);
             break;
         }
     }

@@ -63,7 +63,10 @@ public:
 
     bool unlock(Transaction* txn, LockDataId lock_data_id);
 
+    bool upgrade_lock_on_table(Transaction* txn, int tab_fd);
+
 private:
+    inline void check_wait_die(const std::shared_ptr<LockRequestQueue>& lock_request_queue, Transaction* txn);
     std::mutex latch_;      // 用于锁表的并发
     std::unordered_map<LockDataId, std::shared_ptr<LockRequestQueue>> lock_table_;   // 全局锁表
 };

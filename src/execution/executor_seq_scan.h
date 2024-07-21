@@ -55,12 +55,11 @@ class SeqScanExecutor : public AbstractExecutor {
         {
             auto lock_set = context_->txn_->get_lock_set();
             int table_fd = fh_->GetFd();
-            if(lock_set->find(LockDataId(table_fd, LockDataType::TABLE)) == lock_set->end()) {
-                if(read_only_) {
+            if(read_only_) {
+                if(lock_set->find(LockDataId(table_fd, LockDataType::TABLE)) != lock_set->end())
                     context_->lock_mgr_->lock_shared_on_table(context_->txn_, table_fd);
-                } else {
-                    context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, table_fd);
-                }
+            } else {
+                context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, table_fd);
             }
         }
         scan_ = std::make_unique<RmScan>(fh_);
