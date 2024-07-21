@@ -134,10 +134,8 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd) {
     std::shared_ptr<LockRequest> lock_request;
     for(auto& tmp : lock_request_queue->request_queue_) {
         if(tmp->txn_id_ == txn->get_transaction_id()) {
-            if(lock_request->lock_mode_ == LockMode::SHARED) {
-                lock_request = tmp;
-                break;
-            }
+            lock_request = tmp;
+            break;
         }
     }
     if(lock_request->lock_mode_ == LockMode::EXLUCSIVE)
