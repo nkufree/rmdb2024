@@ -98,7 +98,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
             char* record = write_record->GetRecord().data;
             std::unique_ptr<RmRecord> rec;
             if(type == WType::INSERT_TUPLE || type == WType::UPDATE_TUPLE) {
-                rec = fh_->get_record(write_record->GetRid(), nullptr);
+                rec = fh_->get_record(write_record->GetRid(), &context);
                 record = rec->data;
             }
             for (size_t j = 0; j < (size_t)index.col_num; ++j)
