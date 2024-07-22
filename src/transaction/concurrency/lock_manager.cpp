@@ -137,7 +137,6 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
     std::shared_ptr<LockRequestQueue> lock_request_queue = lock_table_[lock_data_id];
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
     std::shared_ptr<LockRequest> lock_request;
-    check_wait_die(lock_request_queue, txn);
     for(auto& tmp : lock_request_queue->request_queue_) {
         if(tmp->txn_id_ == txn->get_transaction_id()) {
             lock_request = tmp;
@@ -147,7 +146,10 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
     if(lock_request->lock_mode_ == LockMode::EXLUCSIVE)
         return true;
     else
+    {
+        check_wait_die(lock_request_queue, txn);
         lock_request->lock_mode_ = LockMode::EXLUCSIVE;
+    }
     if(lock_request_queue->request_queue_.size() == 1) {
         lock_request_queue->group_lock_mode_ = GroupLockMode::X;
         lock_request->granted_ = true;
@@ -166,7 +168,6 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
     std::shared_ptr<LockRequestQueue> lock_request_queue = lock_table_[lock_data_id];
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
     std::shared_ptr<LockRequest> lock_request;
-    check_wait_die(lock_request_queue, txn);
     for(auto& tmp : lock_request_queue->request_queue_) {
         if(tmp->txn_id_ == txn->get_transaction_id()) {
             lock_request = tmp;
@@ -176,7 +177,10 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
     if(lock_request->lock_mode_ >= lock_mode)
         return true;
     else
+    {
+        check_wait_die(lock_request_queue, txn);
         lock_request->lock_mode_ = lock_mode;
+    }
     if(lock_request_queue->request_queue_.size() == 1) {
         lock_request_queue->group_lock_mode_ = get_group_lock_mode(lock_request->lock_mode_);
         lock_request->granted_ = true;
