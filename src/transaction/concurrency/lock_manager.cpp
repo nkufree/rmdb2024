@@ -157,11 +157,12 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
         lock_request->granted_ = true;
     }
     else {
-        lock_request->granted_ = false;
-        exit(0);
+        std::shared_ptr<LockRequest> new_lock_request(new LockRequest(txn->get_transaction_id(), LockMode::EXLUCSIVE));
+        lock_request_queue->request_queue_.emplace_back(new_lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return lock_request->granted_;
         });
+        lock_request_queue->request_queue_.remove(lock_request);
     }
     return true;
 }
