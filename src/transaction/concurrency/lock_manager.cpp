@@ -325,8 +325,11 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
                     break;
                 }
             }
-            lock_request_queue->group_lock_mode_ = get_group_lock_mode((*it)->lock_mode_);
-            lock_request_queue->cv_.notify_all();
+            if(it != request_queue.end())
+            {
+                lock_request_queue->group_lock_mode_ = get_group_lock_mode((*it)->lock_mode_);
+                lock_request_queue->cv_.notify_all();
+            }
         }
     }
     return true;
