@@ -175,9 +175,6 @@ class Portal
             if(x->tag == T_SeqScan) {
                 return std::make_unique<SeqScanExecutor>(sm_manager_, x->tab_name_, x->conds_, context);
             }
-            else if(x->tag == T_SeqScan_write) {
-                return std::make_unique<SeqScanExecutor>(sm_manager_, x->tab_name_, x->conds_, context, false);
-            }
             else {
                 return std::make_unique<IndexScanExecutor>(sm_manager_, x->tab_name_, x->conds_, x->index_col_names_, context);
             } 

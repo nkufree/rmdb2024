@@ -30,10 +30,9 @@ class SeqScanExecutor : public AbstractExecutor {
     std::unique_ptr<RecScan> scan_;     // table_iterator
 
     SmManager *sm_manager_;
-    bool read_only_;
 
    public:
-    SeqScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, Context *context, bool read_only=true) {
+    SeqScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, Context *context) {
         sm_manager_ = sm_manager;
         tab_name_ = std::move(tab_name);
         conds_ = std::move(conds);
@@ -43,7 +42,6 @@ class SeqScanExecutor : public AbstractExecutor {
         len_ = cols_.back().offset + cols_.back().len;
 
         context_ = context;
-        read_only_ = read_only;
         fed_conds_ = conds_;
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
@@ -51,17 +49,6 @@ class SeqScanExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-        // 对没加锁的表加锁
-        {
-            auto lock_set = context_->txn_->get_lock_set();
-            int table_fd = fh_->GetFd();
-            if(read_only_) {
-                if(lock_set->find(LockDataId(table_fd, LockDataType::TABLE)) == lock_set->end())
-                    context_->lock_mgr_->lock_IS_on_table(context_->txn_, table_fd);
-            } else {
-                context_->lock_mgr_->lock_IX_on_table(context_->txn_, table_fd);
-            }
-        }
         scan_ = std::make_unique<RmScan>(fh_);
         // rid_ = scan_->rid();
         std::unique_ptr<RmRecord> rec;

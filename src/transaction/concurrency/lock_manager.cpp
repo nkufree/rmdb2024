@@ -62,6 +62,7 @@ bool LockManager::check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_
 bool LockManager::lock_shared_on_record(Transaction* txn, const Rid& rid, int tab_fd) {
     if(txn->get_lock_set()->find(LockDataId(tab_fd, rid, LockDataType::RECORD)) != txn->get_lock_set()->end())
         return true;
+    lock_IS_on_table(txn, tab_fd);
     const LockDataId lock_data_id = LockDataId(tab_fd, rid, LockDataType::RECORD);
     std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(lock_data_id);
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::SHARED);
@@ -83,6 +84,7 @@ bool LockManager::lock_shared_on_record(Transaction* txn, const Rid& rid, int ta
 bool LockManager::lock_exclusive_on_record(Transaction* txn, const Rid& rid, int tab_fd) {
     if(txn->get_lock_set()->find(LockDataId(tab_fd, rid, LockDataType::RECORD)) != txn->get_lock_set()->end())
         return upgrade_lock_on_record(txn, rid, tab_fd);
+    lock_IX_on_table(txn, tab_fd);
     const LockDataId lock_data_id = LockDataId(tab_fd, rid, LockDataType::RECORD);
     std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(lock_data_id);
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::EXLUCSIVE);

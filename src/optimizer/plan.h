@@ -40,7 +40,6 @@ typedef enum PlanTag{
     T_Transaction_abort,
     T_Transaction_rollback,
     T_SeqScan,
-    T_SeqScan_write,
     T_IndexScan,
     T_NestLoop,
     T_SortMerge,    // sort merge join
