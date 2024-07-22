@@ -49,6 +49,7 @@ bool LockManager::check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_
         lock_request_queue->request_queue_.emplace_back(lock_request);
         lock_request_queue->group_lock_mode_ = lock_mode;
     }
+    return true;
 }
 
 /**
@@ -59,6 +60,8 @@ bool LockManager::check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_
  * @param {int} tab_fd
  */
 bool LockManager::lock_shared_on_record(Transaction* txn, const Rid& rid, int tab_fd) {
+    if(txn->get_lock_set()->find(LockDataId(tab_fd, rid, LockDataType::RECORD)) != txn->get_lock_set()->end())
+        return true;
     const LockDataId lock_data_id = LockDataId(tab_fd, rid, LockDataType::RECORD);
     std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(lock_data_id);
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::SHARED);
