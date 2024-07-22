@@ -26,11 +26,11 @@ class LockManager {
     bool lock_matrix_[6][6] = {
                         /* NON_LOCK, IS, IX, S, X, SIX */
         /* NON_LOCK */  {true, true, true, true, true, true},
-        /* IS */        {true, true, true, true, false, false},
+        /* IS */        {true, true, true, true, false, true},
         /* IX */        {true, true, true, false, false, false},
         /* S */         {true, true, false, true, false, false},
         /* X */         {true, false, false, false, false, false},
-        /* SIX */       {true, false, false, false, false, false}
+        /* SIX */       {true, true, false, false, false, false}
     };
 
 
