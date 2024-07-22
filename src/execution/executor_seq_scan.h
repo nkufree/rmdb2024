@@ -64,7 +64,20 @@ class SeqScanExecutor : public AbstractExecutor {
         }
         scan_ = std::make_unique<RmScan>(fh_);
         // rid_ = scan_->rid();
-        nextTuple();
+        std::unique_ptr<RmRecord> rec;
+        while (!scan_->is_end())
+        {
+            rec = fh_->get_record(scan_->rid(), context_);
+            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+                break;
+            scan_->next();
+        }
+        if(read_only_)
+            context_->lock_mgr_->lock_shared_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
+        else
+            context_->lock_mgr_->lock_exclusive_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
+        rid_ = scan_->rid();
+
     }
 
     void nextTuple() override {
