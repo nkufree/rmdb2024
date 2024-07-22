@@ -183,7 +183,7 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
         check_wait_die(lock_request_queue, txn);
         lock_request->lock_mode_ = lock_mode;
     }
-    if(lock_compatible(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_mode))) {
+    if(lock_request_queue->request_queue_.size() == 1 || lock_compatible(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_mode))) {
         lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_request->lock_mode_));
         lock_request->granted_ = true;
     }
