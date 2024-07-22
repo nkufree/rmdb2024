@@ -101,7 +101,7 @@ bool LockManager::lock_exclusive_on_record(Transaction* txn, const Rid& rid, int
  * @param {int} tab_fd 目标表的fd
  */
 bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
-    std::cout << "txn " << txn->get_transaction_id() << " lock_shared_on_table " << tab_fd << std::endl;
+    // std::cout << "txn " << txn->get_transaction_id() << " lock_shared_on_table " << tab_fd << std::endl;
     if(txn->get_lock_set()->find(LockDataId(tab_fd, LockDataType::TABLE)) != txn->get_lock_set()->end())
         return upgrade_lock_on_table(txn, tab_fd, LockMode::SHARED);
     const LockDataId lock_data_id = LockDataId(tab_fd, LockDataType::TABLE);
@@ -123,7 +123,7 @@ bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
 bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
     if(txn->get_lock_set()->find(LockDataId(tab_fd, LockDataType::TABLE)) != txn->get_lock_set()->end())
         return upgrade_lock_on_table(txn, tab_fd, LockMode::EXLUCSIVE);
-    std::cout << "txn " << txn->get_transaction_id() << " lock_exclusive_on_table " << tab_fd << std::endl;
+    // std::cout << "txn " << txn->get_transaction_id() << " lock_exclusive_on_table " << tab_fd << std::endl;
     const LockDataId lock_data_id = LockDataId(tab_fd, LockDataType::TABLE);
     std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(lock_data_id);
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::EXLUCSIVE);
@@ -184,7 +184,7 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
         lock_request->lock_mode_ = lock_mode;
     }
     if(lock_request_queue->request_queue_.size() == 1) {
-        lock_request_queue->group_lock_mode_ = get_group_lock_mode(lock_request->lock_mode_);
+        lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_request->lock_mode_));
         lock_request->granted_ = true;
     }
     else {
@@ -294,8 +294,11 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
         else
         {
             for(auto& lock_request : request_queue) {
-                if(lock_matrix_[static_cast<int>(lock_request_queue->group_lock_mode_)][static_cast<int>(get_group_lock_mode(lock_request->lock_mode_))]) {
+                GroupLockMode curr_mode = get_group_lock_mode(lock_request->lock_mode_);
+                if(lock_matrix_[static_cast<int>(lock_request_queue->group_lock_mode_)][static_cast<int>(curr_mode)]) {
                     lock_request->granted_ = true;
+                    if(curr_mode > lock_request_queue->group_lock_mode_)
+                        lock_request_queue->group_lock_mode_ = curr_mode;
                 }
                 else
                 {
