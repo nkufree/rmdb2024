@@ -176,7 +176,7 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
             break;
         }
     }
-    if(lock_request->lock_mode_ >= lock_mode)
+    if(get_group_lock_mode(lock_request->lock_mode_) >= get_group_lock_mode(lock_mode))
         return true;
     else
     {
