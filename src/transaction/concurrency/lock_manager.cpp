@@ -163,7 +163,6 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
             return new_lock_request->granted_;
         });
         lock_request_queue->request_queue_.remove(lock_request);
-        lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(new_lock_request->lock_mode_));
     }
     return true;
 }
@@ -196,7 +195,6 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return new_lock_request->granted_;
         });
-        lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(new_lock_request->lock_mode_));
         lock_request_queue->request_queue_.remove(lock_request);
     }
     return true;
@@ -320,12 +318,14 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
         });
         if(next_granted == request_queue.end())
         {
-            for(auto it = first_granted; it != request_queue.end(); it++) {
+            auto it = first_granted;
+            for(; it != request_queue.end(); it++) {
                 if((*it)->txn_id_ == (*tmp)->txn_id_) {
                     (*it)->granted_ = true;
                     break;
                 }
             }
+            lock_request_queue->group_lock_mode_ = get_group_lock_mode((*it)->lock_mode_);
             lock_request_queue->cv_.notify_all();
         }
     }
