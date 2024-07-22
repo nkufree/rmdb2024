@@ -146,6 +146,8 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
     }
     if(lock_request->lock_mode_ == LockMode::EXLUCSIVE)
         return true;
+    else
+        lock_request->lock_mode_ = LockMode::EXLUCSIVE;
     if(lock_request_queue->request_queue_.size() == 1) {
         lock_request_queue->group_lock_mode_ = GroupLockMode::X;
         lock_request->granted_ = true;
