@@ -23,6 +23,17 @@ class LockManager {
     /* 用于标识加锁队列中排他性最强的锁类型，例如加锁队列中有SHARED和EXLUSIVE两个加锁操作，则该队列的锁模式为X */
     enum class GroupLockMode { NON_LOCK, IS, IX, S, X, SIX};
 
+    bool lock_matrix_[6][6] = {
+                        /* NON_LOCK, IS, IX, S, X, SIX */
+        /* NON_LOCK */  {true, true, true, true, true, true},
+        /* IS */        {true, true, true, true, false, false},
+        /* IX */        {true, true, true, false, false, false},
+        /* S */         {true, true, false, true, false, false},
+        /* X */         {true, false, false, false, false, false},
+        /* SIX */       {true, false, false, false, false, false}
+    };
+
+
     /* 事务的加锁申请 */
     class LockRequest {
     public:
@@ -63,10 +74,18 @@ public:
 
     bool unlock(Transaction* txn, LockDataId lock_data_id);
 
-    bool upgrade_lock_on_table(Transaction* txn, int tab_fd);
 
 private:
     inline void check_wait_die(const std::shared_ptr<LockRequestQueue>& lock_request_queue, Transaction* txn);
+    inline std::shared_ptr<LockRequestQueue> get_lock_request_queue(const LockDataId& lock_data_id);
+    bool check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode);
+
+    bool upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode lock_mode);
+
+    bool upgrade_lock_on_record(Transaction* txn, const Rid& rid, int tab_fd);
+
+    GroupLockMode get_group_lock_mode(LockMode lock_mode);
+
     std::mutex latch_;      // 用于锁表的并发
     std::unordered_map<LockDataId, std::shared_ptr<LockRequestQueue>> lock_table_;   // 全局锁表
 };

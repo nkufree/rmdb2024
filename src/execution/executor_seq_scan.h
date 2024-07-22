@@ -57,23 +57,14 @@ class SeqScanExecutor : public AbstractExecutor {
             int table_fd = fh_->GetFd();
             if(read_only_) {
                 if(lock_set->find(LockDataId(table_fd, LockDataType::TABLE)) == lock_set->end())
-                    // context_->lock_mgr_->lock_shared_on_table(context_->txn_, table_fd);
-                    context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, table_fd);
+                    context_->lock_mgr_->lock_IS_on_table(context_->txn_, table_fd);
             } else {
-                context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, table_fd);
+                context_->lock_mgr_->lock_IX_on_table(context_->txn_, table_fd);
             }
         }
         scan_ = std::make_unique<RmScan>(fh_);
         // rid_ = scan_->rid();
-        std::unique_ptr<RmRecord> rec;
-        while (!scan_->is_end())
-        {
-            rec = fh_->get_record(scan_->rid(), context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
-                break;
-            scan_->next();
-        }
-        rid_ = scan_->rid();
+        nextTuple();
     }
 
     void nextTuple() override {
@@ -90,6 +81,10 @@ class SeqScanExecutor : public AbstractExecutor {
             }
             scan_->next();
         }
+        if(read_only_)
+            context_->lock_mgr_->lock_shared_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
+        else
+            context_->lock_mgr_->lock_exclusive_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
         rid_ = scan_->rid();
     }
 
