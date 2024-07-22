@@ -72,10 +72,6 @@ class SeqScanExecutor : public AbstractExecutor {
                 break;
             scan_->next();
         }
-        if(read_only_)
-            context_->lock_mgr_->lock_shared_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
-        else
-            context_->lock_mgr_->lock_exclusive_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
         rid_ = scan_->rid();
 
     }
@@ -94,10 +90,6 @@ class SeqScanExecutor : public AbstractExecutor {
             }
             scan_->next();
         }
-        if(read_only_)
-            context_->lock_mgr_->lock_shared_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
-        else
-            context_->lock_mgr_->lock_exclusive_on_record(context_->txn_, scan_->rid(), fh_->GetFd());
         rid_ = scan_->rid();
     }
 
