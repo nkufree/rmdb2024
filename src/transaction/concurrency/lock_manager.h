@@ -84,6 +84,10 @@ private:
 
     bool upgrade_lock_on_record(Transaction* txn, const Rid& rid, int tab_fd);
 
+    inline bool lock_compatible(GroupLockMode a, GroupLockMode b) {
+        return lock_matrix_[static_cast<int>(a)][static_cast<int>(b)];
+    }
+
     GroupLockMode get_group_lock_mode(LockMode lock_mode);
 
     std::mutex latch_;      // 用于锁表的并发

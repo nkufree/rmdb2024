@@ -36,7 +36,7 @@ inline std::shared_ptr<LockManager::LockRequestQueue> LockManager::get_lock_requ
 bool LockManager::check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode)
 {
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
-    if(!lock_matrix_[static_cast<int>(lock_request_queue->group_lock_mode_)][static_cast<int>(lock_mode)]) {
+    if(!lock_compatible(lock_request_queue->group_lock_mode_, lock_mode)) {
         check_wait_die(lock_request_queue, txn);
         lock_request_queue->request_queue_.emplace_back(lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
@@ -183,7 +183,7 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
         check_wait_die(lock_request_queue, txn);
         lock_request->lock_mode_ = lock_mode;
     }
-    if(lock_request_queue->request_queue_.size() == 1) {
+    if(lock_compatible(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_mode))) {
         lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_request->lock_mode_));
         lock_request->granted_ = true;
     }
