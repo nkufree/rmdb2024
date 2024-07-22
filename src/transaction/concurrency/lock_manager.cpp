@@ -150,19 +150,20 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
     else
     {
         check_wait_die(lock_request_queue, txn);
-        lock_request->lock_mode_ = LockMode::EXLUCSIVE;
     }
     if(lock_request_queue->request_queue_.size() == 1) {
         lock_request_queue->group_lock_mode_ = GroupLockMode::X;
         lock_request->granted_ = true;
+        lock_request->lock_mode_ = LockMode::EXLUCSIVE;
     }
     else {
         std::shared_ptr<LockRequest> new_lock_request(new LockRequest(txn->get_transaction_id(), LockMode::EXLUCSIVE));
         lock_request_queue->request_queue_.emplace_back(new_lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
-            return lock_request->granted_;
+            return new_lock_request->granted_;
         });
         lock_request_queue->request_queue_.remove(lock_request);
+        lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(new_lock_request->lock_mode_));
     }
     return true;
 }
@@ -195,6 +196,7 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return new_lock_request->granted_;
         });
+        lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(new_lock_request->lock_mode_));
         lock_request_queue->request_queue_.remove(lock_request);
     }
     return true;
@@ -280,12 +282,13 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
             break;
         }
     }
+    auto first_granted = std::find_if(request_queue.begin(), request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
+        return lock_request->granted_;
+    });
     if(request_queue.empty()) {
         lock_request_queue->group_lock_mode_ = GroupLockMode::NON_LOCK;
     }
-    else if(!std::any_of(request_queue.begin(), request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
-        return lock_request->granted_;
-    }))
+    else if(first_granted == request_queue.end())
     {
         // 更新加锁队列的锁模式
         lock_request_queue->group_lock_mode_ = get_group_lock_mode(request_queue.front()->lock_mode_);
@@ -310,15 +313,21 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
     }
     else
     {
-        for(auto& lock_request : request_queue) {
-            GroupLockMode curr_mode = get_group_lock_mode(lock_request->lock_mode_);
-            if(lock_compatible(lock_request_queue->group_lock_mode_, curr_mode)) {
-                lock_request->granted_ = true;
-                if(curr_mode > lock_request_queue->group_lock_mode_)
-                    lock_request_queue->group_lock_mode_ = curr_mode;
+        auto tmp = first_granted;
+        first_granted++;
+        auto next_granted = std::find_if(first_granted, request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
+            return lock_request->granted_;
+        });
+        if(next_granted == request_queue.end())
+        {
+            for(auto it = first_granted; it != request_queue.end(); it++) {
+                if((*it)->txn_id_ == (*tmp)->txn_id_) {
+                    (*it)->granted_ = true;
+                    break;
+                }
             }
+            lock_request_queue->cv_.notify_all();
         }
-        lock_request_queue->cv_.notify_all();
     }
     return true;
 }
