@@ -39,7 +39,6 @@ bool LockManager::check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_
     if(!lock_compatible(lock_request_queue->group_lock_mode_, lock_mode)) {
         check_wait_die(lock_request_queue, txn);
         lock_request_queue->request_queue_.emplace_back(lock_request);
-        exit(0);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return lock_request->granted_;
         });
@@ -191,7 +190,6 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
     }
     else {
         lock_request->granted_ = false;
-        exit(0);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return lock_request->granted_;
         });
