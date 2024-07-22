@@ -182,17 +182,19 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
     else
     {
         check_wait_die(lock_request_queue, txn);
-        lock_request->lock_mode_ = lock_mode;
     }
     if(lock_request_queue->request_queue_.size() == 1 || lock_compatible(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_mode))) {
+        lock_request->lock_mode_ = lock_mode;
         lock_request_queue->group_lock_mode_ = std::max(lock_request_queue->group_lock_mode_, get_group_lock_mode(lock_request->lock_mode_));
         lock_request->granted_ = true;
     }
     else {
-        lock_request->granted_ = false;
+        std::shared_ptr<LockRequest> new_lock_request(new LockRequest(txn->get_transaction_id(), lock_mode));
+        lock_request_queue->request_queue_.emplace_back(new_lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
-            return lock_request->granted_;
+            return new_lock_request->granted_;
         });
+        lock_request_queue->request_queue_.remove(lock_request);
     }
     return true;
 }
@@ -296,15 +298,23 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
         {
             for(auto& lock_request : request_queue) {
                 GroupLockMode curr_mode = get_group_lock_mode(lock_request->lock_mode_);
-                if(lock_matrix_[static_cast<int>(lock_request_queue->group_lock_mode_)][static_cast<int>(curr_mode)]) {
+                if(lock_compatible(lock_request_queue->group_lock_mode_, curr_mode)) {
                     lock_request->granted_ = true;
                     if(curr_mode > lock_request_queue->group_lock_mode_)
                         lock_request_queue->group_lock_mode_ = curr_mode;
                 }
-                else
-                {
-                    continue;
-                }
+            }
+        }
+        lock_request_queue->cv_.notify_all();
+    }
+    else
+    {
+        for(auto& lock_request : request_queue) {
+            GroupLockMode curr_mode = get_group_lock_mode(lock_request->lock_mode_);
+            if(lock_compatible(lock_request_queue->group_lock_mode_, curr_mode)) {
+                lock_request->granted_ = true;
+                if(curr_mode > lock_request_queue->group_lock_mode_)
+                    lock_request_queue->group_lock_mode_ = curr_mode;
             }
         }
         lock_request_queue->cv_.notify_all();
