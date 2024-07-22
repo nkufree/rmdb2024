@@ -104,6 +104,11 @@ class UpdateExecutor : public AbstractExecutor {
             }
             if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
                 continue;
+            // 更新记录
+            fh_->update_record(rid, rec_new->data, context_);
+            WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec);
+            context_->txn_->append_write_record(wr);
+            // 更新索引
             // 先尝试插入数据，如果插入成功再尝试删除原来的数据
             int failed_idx = -1;
             for(size_t i = 0; i < update_indexes_.size(); i++) {
@@ -140,12 +145,6 @@ class UpdateExecutor : public AbstractExecutor {
                     // TODO: 回滚之前更新的数据
                     throw IndexDuplicateKeyError();
                 }
-            }
-            else {
-                // 如果成功，更新表中的数据
-                fh_->update_record(rid, rec_new->data, context_);
-                WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec);
-                context_->txn_->append_write_record(wr);
             }
         }
         delete[] key;
