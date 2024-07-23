@@ -20,7 +20,8 @@ std::unique_ptr<RmRecord> RmFileHandle::get_record(const Rid& rid, Context* cont
     // Todo:
     // 1. 获取指定记录所在的page handle
     // 2. 初始化一个指向RmRecord的指针（赋值其内部的data和size）
-    context->lock_mgr_->lock_shared_on_record(context->txn_, rid, fd_);
+    // context->lock_mgr_->lock_shared_on_record(context->txn_, rid, fd_);
+    context->lock_mgr_->lock_shared_on_table(context->txn_, fd_);
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     char* slot = page_handle.get_slot(rid.slot_no);
     std::unique_ptr<RmRecord> record = std::make_unique<RmRecord>(file_hdr_.record_size, slot);
@@ -91,7 +92,8 @@ void RmFileHandle::delete_record(const Rid& rid, Context* context) {
     // 1. 获取指定记录所在的page handle
     // 2. 更新page_handle.page_hdr中的数据结构
     // 注意考虑删除一条记录后页面未满的情况，需要调用release_page_handle()
-    context->lock_mgr_->lock_exclusive_on_record(context->txn_, rid, fd_);
+    // context->lock_mgr_->lock_exclusive_on_record(context->txn_, rid, fd_);
+    context->lock_mgr_->lock_exclusive_on_table(context->txn_, fd_);
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     if(Bitmap::is_set(page_handle.bitmap, rid.slot_no)) 
     {
@@ -116,7 +118,8 @@ void RmFileHandle::update_record(const Rid& rid, char* buf, Context* context) {
     // Todo:
     // 1. 获取指定记录所在的page handle
     // 2. 更新记录
-    context->lock_mgr_->lock_exclusive_on_record(context->txn_, rid, fd_);
+    // context->lock_mgr_->lock_exclusive_on_record(context->txn_, rid, fd_);
+    context->lock_mgr_->lock_exclusive_on_table(context->txn_, fd_);
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     char* slot = page_handle.get_slot(rid.slot_no);
     memcpy(slot, buf, file_hdr_.record_size);
