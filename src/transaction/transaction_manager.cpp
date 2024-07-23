@@ -54,6 +54,21 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 5. 更新事务状态
     std::scoped_lock lock(latch_);
     txn->get_write_set()->clear();
+    for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
+    {
+        if(it->type_ == LockDataType::RECORD)
+        {
+            lock_manager_->unlock(txn, *it);
+            it = txn->get_lock_set()->erase(it);
+        }
+        else
+            it++;
+    }
+    for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
+    {
+        lock_manager_->unlock(txn, *it);
+        it = txn->get_lock_set()->erase(it);
+    }
     txn->set_state(TransactionState::COMMITTED);
 }
 
@@ -94,7 +109,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
             char* record = write_record->GetRecord().data;
             std::unique_ptr<RmRecord> rec;
             if(type == WType::INSERT_TUPLE || type == WType::UPDATE_TUPLE) {
-                rec = fh_->get_record(write_record->GetRid(), nullptr);
+                rec = fh_->get_record(write_record->GetRid(), &context);
                 record = rec->data;
             }
             for (size_t j = 0; j < (size_t)index.col_num; ++j)
@@ -142,6 +157,22 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
             break;
         }
         delete write_record;
+    }
+    // 释放锁
+    for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
+    {
+        if(it->type_ == LockDataType::RECORD)
+        {
+            lock_manager_->unlock(txn, *it);
+            it = txn->get_lock_set()->erase(it);
+        }
+        else
+            it++;
+    }
+    for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
+    {
+        lock_manager_->unlock(txn, *it);
+        it = txn->get_lock_set()->erase(it);
     }
     txn->set_state(TransactionState::ABORTED);
 }

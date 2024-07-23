@@ -92,8 +92,6 @@ class UpdateExecutor : public AbstractExecutor {
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
-            WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec);
-            context_->txn_->append_write_record(wr);
             std::unique_ptr<RmRecord> rec_new(new RmRecord(*rec));
             for (size_t i = 0; i < set_clauses_.size(); i++) {
                 auto &col = tab_.cols[set_idxs_[i]];
@@ -106,6 +104,11 @@ class UpdateExecutor : public AbstractExecutor {
             }
             if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
                 continue;
+            // 更新记录
+            fh_->update_record(rid, rec_new->data, context_);
+            WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec);
+            context_->txn_->append_write_record(wr);
+            // 更新索引
             // 先尝试插入数据，如果插入成功再尝试删除原来的数据
             int failed_idx = -1;
             for(size_t i = 0; i < update_indexes_.size(); i++) {
@@ -143,12 +146,7 @@ class UpdateExecutor : public AbstractExecutor {
                     throw IndexDuplicateKeyError();
                 }
             }
-            else {
-                // 如果成功，更新表中的数据
-                fh_->update_record(rid, rec_new->data, context_);
-            }
         }
-        
         delete[] key;
         return nullptr;
     }

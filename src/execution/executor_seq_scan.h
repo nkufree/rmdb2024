@@ -31,7 +31,6 @@ class SeqScanExecutor : public AbstractExecutor {
 
     SmManager *sm_manager_;
 
-
    public:
     SeqScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, Context *context) {
         sm_manager_ = sm_manager;
@@ -43,7 +42,6 @@ class SeqScanExecutor : public AbstractExecutor {
         len_ = cols_.back().offset + cols_.back().len;
 
         context_ = context;
-
         fed_conds_ = conds_;
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
@@ -62,6 +60,7 @@ class SeqScanExecutor : public AbstractExecutor {
             scan_->next();
         }
         rid_ = scan_->rid();
+
     }
 
     void nextTuple() override {
