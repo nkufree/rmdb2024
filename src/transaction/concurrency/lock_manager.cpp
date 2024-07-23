@@ -313,7 +313,6 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
     }
     else if(!lock_request_queue->upgrade_queue_.empty() && (*first_granted)->txn_id_ == lock_request_queue->upgrade_queue_.front()->txn_id_)
     {
-        auto tmp = first_granted;
         first_granted++;
         // 查找下一个已经获取锁的请求，如果没有就说明可以升级锁
         bool other_granted = std::any_of(first_granted, request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
@@ -323,6 +322,7 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
         {
             auto& upgrade_lock = lock_request_queue->upgrade_queue_.front();
             lock_request_queue->group_lock_mode_ = get_group_lock_mode(upgrade_lock->lock_mode_);
+            upgrade_lock->granted_ = true;
             lock_request_queue->cv_.notify_all();
         }
     }
