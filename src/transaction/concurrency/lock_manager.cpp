@@ -158,11 +158,12 @@ bool LockManager::upgrade_lock_on_record(Transaction* txn,const Rid& rid, int ta
     }
     else {
         std::shared_ptr<LockRequest> new_lock_request(new LockRequest(txn->get_transaction_id(), LockMode::EXLUCSIVE));
-        lock_request_queue->request_queue_.emplace_back(new_lock_request);
+        lock_request_queue->upgrade_queue_.emplace_back(new_lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return new_lock_request->granted_;
         });
-        lock_request_queue->request_queue_.remove(lock_request);
+        lock_request->lock_mode_ = LockMode::EXLUCSIVE;
+        lock_request_queue->upgrade_queue_.remove(new_lock_request);
     }
     return true;
 }
@@ -191,11 +192,12 @@ bool LockManager::upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode l
     }
     else {
         std::shared_ptr<LockRequest> new_lock_request(new LockRequest(txn->get_transaction_id(), lock_mode));
-        lock_request_queue->request_queue_.emplace_back(new_lock_request);
+        lock_request_queue->upgrade_queue_.emplace_back(new_lock_request);
         lock_request_queue->cv_.wait(queue_lock, [&](){
             return new_lock_request->granted_;
         });
-        lock_request_queue->request_queue_.remove(lock_request);
+        lock_request->lock_mode_ = lock_mode;
+        lock_request_queue->upgrade_queue_.remove(new_lock_request);
     }
     return true;
 }
@@ -309,27 +311,19 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
         }
         lock_request_queue->cv_.notify_all();
     }
-    else
+    else if(!lock_request_queue->upgrade_queue_.empty() && (*first_granted)->txn_id_ == lock_request_queue->upgrade_queue_.front()->txn_id_)
     {
         auto tmp = first_granted;
         first_granted++;
-        auto next_granted = std::find_if(first_granted, request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
+        // 查找下一个已经获取锁的请求，如果没有就说明可以升级锁
+        bool other_granted = std::any_of(first_granted, request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
             return lock_request->granted_;
         });
-        if(next_granted == request_queue.end())
+        if(!other_granted)
         {
-            auto it = first_granted;
-            for(; it != request_queue.end(); it++) {
-                if((*it)->txn_id_ == (*tmp)->txn_id_) {
-                    (*it)->granted_ = true;
-                    break;
-                }
-            }
-            if(it != request_queue.end())
-            {
-                lock_request_queue->group_lock_mode_ = get_group_lock_mode((*it)->lock_mode_);
-                lock_request_queue->cv_.notify_all();
-            }
+            auto& upgrade_lock = lock_request_queue->upgrade_queue_.front();
+            lock_request_queue->group_lock_mode_ = get_group_lock_mode(upgrade_lock->lock_mode_);
+            lock_request_queue->cv_.notify_all();
         }
     }
     return true;

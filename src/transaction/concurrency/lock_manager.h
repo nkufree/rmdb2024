@@ -49,6 +49,7 @@ class LockManager {
     class LockRequestQueue {
     public:
         std::list<std::shared_ptr<LockRequest>> request_queue_;  // 加锁队列
+        std::list<std::shared_ptr<LockRequest>> upgrade_queue_;  // 升级队列
         std::mutex latch_;     // 用于加锁队列的互斥锁
         std::condition_variable cv_;            // 条件变量，用于唤醒正在等待加锁的申请，在no-wait策略下无需使用
         GroupLockMode group_lock_mode_ = GroupLockMode::NON_LOCK;   // 加锁队列的锁模式，即队列中已获取锁的最高级别
