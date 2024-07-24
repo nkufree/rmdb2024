@@ -54,6 +54,11 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 5. 更新事务状态
     std::scoped_lock lock(latch_);
     txn->get_write_set()->clear();
+    for(auto it = txn->get_gap_lock_set()->begin(); it != txn->get_gap_lock_set()->end();)
+    {
+        lock_manager_->unlock(txn, *it);
+        it = txn->get_gap_lock_set()->erase(it);
+    }
     for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
     {
         if(it->type_ == LockDataType::RECORD)
@@ -157,6 +162,11 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
             break;
         }
         delete write_record;
+    }
+    for(auto it = txn->get_gap_lock_set()->begin(); it != txn->get_gap_lock_set()->end();)
+    {
+        lock_manager_->unlock(txn, *it);
+        it = txn->get_gap_lock_set()->erase(it);
     }
     // 释放锁
     for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)

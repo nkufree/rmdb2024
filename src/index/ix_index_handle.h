@@ -281,9 +281,9 @@ class IxIndexHandle {
     std::shared_ptr<char[]> get_last_key(const Iid& curr, IxNodeHandle* node) const;
     std::shared_ptr<char[]> get_next_key(const Iid& curr, IxNodeHandle* node) const;
 
-    bool lock_two_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const;
+    bool lock_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const;
 
-    bool lock_two_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const;
+    bool lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context, bool insert=false) const;
 public:
     Rid get_rid(const Iid &iid, Context *context) const;
     int get_btree_order() const { return file_hdr_->btree_order_; }

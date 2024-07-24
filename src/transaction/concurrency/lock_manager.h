@@ -79,6 +79,8 @@ public:
 
     bool unlock(Transaction* txn, LockDataId lock_data_id);
 
+    bool unlock(Transaction* txn, GapLockId lock_data_id);
+
 
 private:
     inline void check_wait_die(const std::shared_ptr<LockRequestQueue>& lock_request_queue, Transaction* txn);

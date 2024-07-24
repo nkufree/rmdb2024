@@ -20,8 +20,8 @@ std::unique_ptr<RmRecord> RmFileHandle::get_record(const Rid& rid, Context* cont
     // Todo:
     // 1. 获取指定记录所在的page handle
     // 2. 初始化一个指向RmRecord的指针（赋值其内部的data和size）
-    // context->lock_mgr_->lock_shared_on_record(context->txn_, rid, fd_);
-    context->lock_mgr_->lock_shared_on_table(context->txn_, fd_);
+    context->lock_mgr_->lock_shared_on_record(context->txn_, rid, fd_);
+    // context->lock_mgr_->lock_shared_on_table(context->txn_, fd_);
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     char* slot = page_handle.get_slot(rid.slot_no);
     std::unique_ptr<RmRecord> record = std::make_unique<RmRecord>(file_hdr_.record_size, slot);
