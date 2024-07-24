@@ -272,7 +272,7 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
             offset += cols[i].len;
         }
         bool success;
-        ih->insert_entry(key, scan->rid(), context->txn_, &success);
+        ih->insert_entry(key, scan->rid(), context->txn_, context, &success);
         if(!success) {
             fh->delete_record(scan->rid(), context);
         }

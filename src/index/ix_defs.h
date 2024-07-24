@@ -22,6 +22,11 @@ constexpr int IX_INIT_ROOT_PAGE = 2;
 constexpr int IX_INIT_NUM_PAGES = 3;
 constexpr int IX_MAX_COL_LEN = 512;
 
+constexpr int INT_MIN = std::numeric_limits<int>::min();
+constexpr int INT_MAX = std::numeric_limits<int>::max();
+constexpr float FLOAT_MIN = std::numeric_limits<float>::min();
+constexpr float FLOAT_MAX = std::numeric_limits<float>::max();
+
 class IxFileHdr {
 public: 
     page_id_t first_free_page_no_;      // 文件中第一个空闲的磁盘页面的页面号
@@ -37,7 +42,8 @@ public:
     page_id_t first_leaf_;              // 首叶节点对应的页号，在上层IxManager的open函数进行初始化，初始化为root page_no
     page_id_t last_leaf_;               // 尾叶节点对应的页号
     int tot_len_;                       // 记录结构体的整体长度
-
+    char* min_key_;
+    char* max_key_;
     IxFileHdr() {
         tot_len_ = col_num_ = 0;
     }
@@ -47,7 +53,40 @@ public:
                 : first_free_page_no_(first_free_page_no), num_pages_(num_pages), root_page_(root_page), col_num_(col_num),
                 col_tot_len_(col_tot_len), btree_order_(btree_order), keys_size_(keys_size), first_leaf_(first_leaf), last_leaf_(last_leaf) {
                     tot_len_ = 0;
+                    init_min_max_key();
                 } 
+    ~IxFileHdr() {
+        delete[] min_key_;
+        delete[] max_key_;
+    }
+
+    void init_min_max_key()
+    {
+        min_key_ = new char[col_tot_len_];
+        max_key_ = new char[col_tot_len_];
+        int curr_len = 0;
+        for(ColType& type: col_types_)
+        {
+            switch (type)
+            {
+            case TYPE_INT:
+                memcpy(min_key_ + curr_len, &INT_MIN, sizeof(int));
+                memcpy(max_key_ + curr_len, &INT_MAX, sizeof(int));
+                break;
+            case TYPE_FLOAT:
+                memcpy(min_key_ + curr_len, &FLOAT_MIN, sizeof(float));
+                memcpy(max_key_ + curr_len, &FLOAT_MAX, sizeof(float));
+                break;
+            case TYPE_STRING:
+                memset(min_key_ + curr_len, 0, col_lens_[curr_len]);
+                memset(max_key_ + curr_len, 0xFF, col_lens_[curr_len]);
+                break;
+            default:
+                break;
+            }
+            curr_len += col_lens_[curr_len];
+        }
+    }
 
     void update_tot_len() {
         tot_len_ = 0;

@@ -122,13 +122,13 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
             switch (type)
             {
             case WType::INSERT_TUPLE:
-                ih->delete_entry(key, txn);
+                ih->delete_entry(key, txn, &context);
                 break;
             case WType::DELETE_TUPLE:
-                ih->insert_entry(key, write_record->GetRid(), txn);
+                ih->insert_entry(key, write_record->GetRid(), txn, &context);
                 break;
             case WType::UPDATE_TUPLE:
-                ih->delete_entry(key, txn);
+                ih->delete_entry(key, txn, &context);
                 old_rec = write_record->GetRecord().data;
                 offset = 0;
                 for (size_t j = 0; j < (size_t)index.col_num; ++j)
@@ -136,7 +136,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
                     memcpy(old_key + offset, old_rec + index.cols[j].offset, index.cols[j].len);
                     offset += index.cols[j].len;
                 }
-                ih->insert_entry(old_key, write_record->GetRid(), txn);
+                ih->insert_entry(old_key, write_record->GetRid(), txn, &context);
                 break;
             default:
                 break;

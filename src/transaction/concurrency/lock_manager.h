@@ -73,17 +73,28 @@ public:
 
     bool lock_IX_on_table(Transaction* txn, int tab_fd);
 
+    bool lock_gap_shared_on_index(Transaction* txn, int index_fd, int len, std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key);
+
+    bool lock_gap_exclusive_on_index(Transaction* txn, int index_fd, int len, std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key);
+
     bool unlock(Transaction* txn, LockDataId lock_data_id);
 
 
 private:
     inline void check_wait_die(const std::shared_ptr<LockRequestQueue>& lock_request_queue, Transaction* txn);
     inline std::shared_ptr<LockRequestQueue> get_lock_request_queue(const LockDataId& lock_data_id);
-    bool check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode);
+
+    inline std::shared_ptr<LockRequestQueue> get_lock_request_queue(const GapLockId& lock_data_id);
+
+    bool check_and_add_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode);
+
+    bool check_and_add_gap_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode);
 
     bool upgrade_lock_on_table(Transaction* txn, int tab_fd, LockMode lock_mode);
 
     bool upgrade_lock_on_record(Transaction* txn, const Rid& rid, int tab_fd);
+
+    bool upgrade_gap_lock(Transaction* txn, const GapLockId& gap_lock_id);
 
     inline bool lock_compatible(GroupLockMode a, GroupLockMode b) {
         return lock_matrix_[static_cast<int>(a)][static_cast<int>(b)];
@@ -93,4 +104,5 @@ private:
 
     std::mutex latch_;      // 用于锁表的并发
     std::unordered_map<LockDataId, std::shared_ptr<LockRequestQueue>> lock_table_;   // 全局锁表
+    std::unordered_map<GapLockId, std::shared_ptr<LockRequestQueue>> gap_lock_table_;
 };

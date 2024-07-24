@@ -71,7 +71,7 @@ class InsertExecutor : public AbstractExecutor {
                     offset += index.cols[j].len;
                 }
                 bool success;
-                ih->insert_entry(key, rid_, context_->txn_, &success);
+                ih->insert_entry(key, rid_, context_->txn_, context_, &success);
                 if(!success) {
                     fh_->delete_record(rid_, context_);
                     for(size_t k = 0; k < i; ++k) {
@@ -82,7 +82,7 @@ class InsertExecutor : public AbstractExecutor {
                             memcpy(key + offset, rec.data + del_index.cols[j].offset, del_index.cols[j].len);
                             offset += del_index.cols[j].len;
                         }
-                        del_ih->delete_entry(key, context_->txn_);
+                        del_ih->delete_entry(key, context_->txn_, context_);
                     }
                     throw IndexDuplicateKeyError();
                     break;

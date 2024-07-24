@@ -66,7 +66,7 @@ class WriteRecord {
 };
 
 /* 多粒度锁，加锁对象的类型，包括记录和表 */
-enum class LockDataType { TABLE = 0, RECORD = 1 };
+enum class LockDataType { TABLE = 0, RECORD = 1};
 
 /**
  * @description: 加锁对象的唯一标识
@@ -114,6 +114,35 @@ class LockDataId {
 template <>
 struct std::hash<LockDataId> {
     size_t operator()(const LockDataId &obj) const { return std::hash<int64_t>()(obj.Get()); }
+};
+
+class GapLockId {
+public:
+    GapLockId(int fd, std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key, int len) : fd_(fd) {
+        len_ = len;
+        start_key_ = start_key;
+        end_key_ = end_key;
+    }
+    
+    inline int64_t Get() const {
+        return ((static_cast<int64_t>(fd_)) << 48) | ((static_cast<int32_t>(*(int*)start_key_.get())) << 24) |
+                (static_cast<int32_t>(*(int*)end_key_.get()));
+    }
+    
+    bool operator==(const GapLockId &other) const {
+        if (fd_ != other.fd_) return false;
+        return memcmp(start_key_.get(), other.start_key_.get(), len_) == 0 && memcmp(end_key_.get(), other.end_key_.get(), len_) == 0;
+    }
+    
+    int fd_;
+    int len_;
+    std::shared_ptr<char[]> start_key_;
+    std::shared_ptr<char[]> end_key_;
+};
+
+template <>
+struct std::hash<GapLockId> {
+    size_t operator()(const GapLockId &obj) const { return std::hash<int64_t>()(obj.Get()); }
 };
 
 /* 事务回滚原因 */

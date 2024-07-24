@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "ix_defs.h"
 #include "transaction/transaction.h"
+#include "common/context.h"
 #include <queue>
 
 enum class Operation { FIND = 0, INSERT, DELETE };  // 三种操作：查找、插入、删除
@@ -154,13 +155,15 @@ class IxNodeHandle {
     bool leaf_lookup(const char *key, Rid **value);
 
     int insert(const char *key, const Rid &value);
-
+    int insert(int pos, const char *key, const Rid &value);
     // 用于在结点中的指定位置插入单个键值对
     void insert_pair(int pos, const char *key, const Rid &rid) { insert_pairs(pos, key, &rid, 1); }
 
     void erase_pair(int pos);
 
     int remove(const char *key);
+
+    int remove(int pos, const char *key);
 
     /**
      * @brief used in internal node to remove the last key in root node, and return the last child
@@ -223,15 +226,15 @@ class IxIndexHandle {
                                                  bool find_first = false);
 
     // for insert
-    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success);
-    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context, bool* success);
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context);
 
     IxNodeHandle *split(IxNodeHandle *node);
 
     void insert_into_parent(IxNodeHandle *old_node, const char *key, IxNodeHandle *new_node, Transaction *transaction);
 
     // for delete
-    bool delete_entry(const char *key, Transaction *transaction);
+    bool delete_entry(const char *key, Transaction *transaction, Context *context);
 
     bool coalesce_or_redistribute(IxNodeHandle *node, Transaction *transaction = nullptr,
                                 bool *root_is_latched = nullptr);
@@ -273,8 +276,16 @@ class IxIndexHandle {
     void maintain_child(IxNodeHandle *node, int child_idx);
 
     // for index test
+
+    // for gap lock
+    std::shared_ptr<char[]> get_last_key(const Iid& curr, IxNodeHandle* node) const;
+    std::shared_ptr<char[]> get_next_key(const Iid& curr, IxNodeHandle* node) const;
+
+    bool lock_two_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const;
+
+    bool lock_two_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const;
 public:
-    Rid get_rid(const Iid &iid) const;
+    Rid get_rid(const Iid &iid, Context *context) const;
     int get_btree_order() const { return file_hdr_->btree_order_; }
 
     void print_tree() {

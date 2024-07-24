@@ -80,7 +80,7 @@ class UpdateExecutor : public AbstractExecutor {
                 Iid lower = ih->lower_bound(key);
                 Iid upper = ih->upper_bound(key);
                 if(lower != upper) {
-                    Rid curr = ih->get_rid(lower);
+                    Rid curr = ih->get_rid(lower, context_);
                     if(!(curr == rid)) {
                         delete[] key;
                         throw IndexDuplicateKeyError();
@@ -120,7 +120,7 @@ class UpdateExecutor : public AbstractExecutor {
                     offset += index.cols[i].len;
                 }
                 bool success;
-                ih->insert_entry(key, rid, context_->txn_, &success);
+                ih->insert_entry(key, rid, context_->txn_, context_, &success);
                 if(!success) {
                     continue;
                 }
@@ -129,7 +129,7 @@ class UpdateExecutor : public AbstractExecutor {
                     memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
                     offset += index.cols[i].len;
                 }
-                ih->delete_entry(key, context_->txn_);
+                ih->delete_entry(key, context_->txn_, context_);
             }
             if(failed_idx != -1) {
                 // 如果失败，删除之前插入的数据
@@ -141,7 +141,7 @@ class UpdateExecutor : public AbstractExecutor {
                         memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
                         offset += index.cols[i].len;
                     }
-                    ih->delete_entry(key, context_->txn_);
+                    ih->delete_entry(key, context_->txn_, context_);
                     // TODO: 回滚之前更新的数据
                     throw IndexDuplicateKeyError();
                 }

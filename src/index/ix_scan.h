@@ -23,10 +23,11 @@ class IxScan : public RecScan {
     Iid iid_;  // 初始为lower（用于遍历的指针）
     Iid end_;  // 初始为upper
     BufferPoolManager *bpm_;
+    Context* context_;
 
    public:
-    IxScan(const IxIndexHandle *ih, const Iid &lower, const Iid &upper, BufferPoolManager *bpm)
-        : ih_(ih), iid_(lower), end_(upper), bpm_(bpm) {}
+    IxScan(const IxIndexHandle *ih, const Iid &lower, const Iid &upper, BufferPoolManager *bpm, Context *context)
+        : ih_(ih), iid_(lower), end_(upper), bpm_(bpm), context_(context) {}
 
     void next() override;
 

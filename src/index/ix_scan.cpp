@@ -31,5 +31,5 @@ void IxScan::next() {
 }
 
 Rid IxScan::rid() const {
-    return ih_->get_rid(iid_);
+    return ih_->get_rid(iid_, context_);
 }

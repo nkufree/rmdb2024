@@ -9,7 +9,6 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "ix_index_handle.h"
-
 #include "ix_scan.h"
 
 /**
@@ -165,6 +164,24 @@ void IxNodeHandle::insert_pairs(int pos, const char *key, const Rid *rid, int n)
  * @param (key, value) 要插入的键值对
  * @return int 键值对数量
  */
+int IxNodeHandle::insert(int pos, const char *key, const Rid &value) {
+    assert(page_hdr->num_key <= file_hdr->btree_order_);
+    // 2,3
+    if(pos >= page_hdr->num_key || ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) != 0)
+    {
+        insert_pairs(pos, key, &value, 1);
+    }
+    // 4
+    return page_hdr->num_key;
+}
+
+/**
+ * @brief 用于在结点中插入单个键值对。
+ * 函数返回插入后的键值对数量
+ *
+ * @param (key, value) 要插入的键值对
+ * @return int 键值对数量
+ */
 int IxNodeHandle::insert(const char *key, const Rid &value) {
     // Todo:
     // 1. 查找要插入的键值对应该插入到当前节点的哪个位置
@@ -204,6 +221,26 @@ void IxNodeHandle::erase_pair(int pos) {
 /**
  * @brief 用于在结点中删除指定key的键值对。函数返回删除后的键值对数量
  *
+ * @param pos 要删除的键值对位置
+ * @return 完成删除操作后的键值对数量
+ */
+int IxNodeHandle::remove(int pos, const char *key) {
+    // Todo:
+    // 1. 查找要删除键值对的位置
+    // 2. 如果要删除的键值对存在，删除键值对
+    // 3. 返回完成删除操作后的键值对数量
+    
+    // 2,3
+    if(pos < page_hdr->num_key && ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
+    {
+        erase_pair(pos);
+    }
+    return page_hdr->num_key;
+}
+
+/**
+ * @brief 用于在结点中删除指定key的键值对。函数返回删除后的键值对数量
+ *
  * @param key 要删除的键值对key值
  * @return 完成删除操作后的键值对数量
  */
@@ -213,6 +250,7 @@ int IxNodeHandle::remove(const char *key) {
     // 2. 如果要删除的键值对存在，删除键值对
     // 3. 返回完成删除操作后的键值对数量
     int pos = lower_bound(key);
+    
     // 2,3
     if(pos < page_hdr->num_key && ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
     {
@@ -386,9 +424,78 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     // std::cout << "End Insert into parent" << std::endl;
 }
 
-page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction) {
+std::shared_ptr<char[]> IxIndexHandle::get_last_key(const Iid& curr, IxNodeHandle* node) const
+{
+    std::shared_ptr<char[]> res(new char[file_hdr_->col_tot_len_]);;
+    if(curr.slot_no > 0)
+    {
+        const char* last_key = node->get_key(curr.slot_no - 1);
+        memcpy(res.get(), last_key, file_hdr_->col_tot_len_);
+    }
+    else
+    {
+        page_id_t last_page_no = node->get_prev_leaf();
+        if(last_page_no != IX_NO_PAGE)
+        {
+            IxNodeHandle* last_node = fetch_node(last_page_no);
+            int last_slot_no = last_node->get_size() - 1;
+            const char* last_key = node->get_key(last_slot_no);
+            memcpy(res.get(), last_key, file_hdr_->col_tot_len_);
+            buffer_pool_manager_->unpin_page(last_node->get_page_id(), false);  // unpin it!
+        }
+        else
+        {
+            memcpy(res.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
+        }
+    }
+    return res;
+}
+
+std::shared_ptr<char[]> IxIndexHandle::get_next_key(const Iid& curr, IxNodeHandle* node) const
+{
+    std::shared_ptr<char[]> res(new char[file_hdr_->col_tot_len_]);
+    if(curr.slot_no < node->get_size() - 1)
+    {
+        const char* next_key = node->get_key(curr.slot_no + 1);
+        memcpy(res.get(), next_key, file_hdr_->col_tot_len_);
+    }
+    else
+    {
+        page_id_t next_page_no = node->get_next_leaf();
+        if(next_page_no != IX_NO_PAGE)
+        {
+            IxNodeHandle* last_node = fetch_node(next_page_no);
+            const char* next_key = node->get_key(0);
+            memcpy(res.get(), next_key, file_hdr_->col_tot_len_);
+            buffer_pool_manager_->unpin_page(last_node->get_page_id(), false);  // unpin it!
+        }
+        else
+        {
+            memcpy(res.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
+        }
+    }
+    return res;
+}
+
+bool IxIndexHandle::lock_two_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const
+{
+    auto last_key = get_last_key(iid, node);
+    auto next_key = get_next_key(iid, node);
+    bool res = context->lock_mgr_->lock_gap_shared_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, next_key);
+    return res;
+}
+
+bool IxIndexHandle::lock_two_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const
+{
+    auto last_key = get_last_key(iid, node);
+    auto next_key = get_next_key(iid, node);
+    bool res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, next_key);
+    return res;
+}
+
+page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context) {
     bool success;
-    return insert_entry(key, value, transaction, &success);
+    return insert_entry(key, value, transaction, context, &success);
 }
 
 /**
@@ -397,7 +504,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
  * @param transaction 事务指针
  * @return page_id_t 插入到的叶结点的page_no
  */
-page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success) {
+page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context, bool* success) {
     // Todo:
     // 1. 查找key值应该插入到哪个叶子节点
     // 2. 在该叶子节点中插入键值对
@@ -407,7 +514,9 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::INSERT, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
     int prev_num_key = node->get_size();
-    int num_key = node->insert(key, value);
+    int pos = node->lower_bound(key);
+    lock_two_gap_exclusive({node->get_page_no(), pos}, node.get(), context);
+    int num_key = node->insert(pos, key, value);
     if(num_key == prev_num_key)
     {
         buffer_pool_manager_->unpin_page(node->get_page_id(), true);
@@ -433,7 +542,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
  * @param key 要删除的key值
  * @param transaction 事务指针
  */
-bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
+bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction, Context *context) {
     // Todo:
     // 1. 获取该键值对所在的叶子结点
     // 2. 在该叶子结点中删除键值对
@@ -442,7 +551,9 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
     std::scoped_lock<std::mutex> lock(root_latch_);
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::DELETE, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
-    node->remove(key);
+    int pos = node->lower_bound(key);
+    lock_two_gap_exclusive({node->get_page_no(), pos}, node.get(), context);
+    node->remove(pos, key);
     if(node->lower_bound(key) == 0)
         maintain_parent(node.get());
     bool root_is_latched = false;
@@ -674,8 +785,9 @@ bool IxIndexHandle::coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, 
  * @return Rid
  * @note iid和rid存的不是一个东西，rid是上层传过来的记录位置，iid是索引内部生成的索引槽位置
  */
-Rid IxIndexHandle::get_rid(const Iid &iid) const {
+Rid IxIndexHandle::get_rid(const Iid &iid, Context *context) const {
     IxNodeHandle *node = fetch_node(iid.page_no);
+    lock_two_gap_shared(iid, node, context);
     if (iid.slot_no >= node->get_size()) {
         throw IndexEntryNotFoundError();
     }

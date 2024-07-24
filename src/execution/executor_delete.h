@@ -61,7 +61,7 @@ class DeleteExecutor : public AbstractExecutor {
                     memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
                     offset += index.cols[i].len;
                 }
-                ih->delete_entry(key, context_->txn_);
+                ih->delete_entry(key, context_->txn_, context_);
             }
         }
         delete[] key;

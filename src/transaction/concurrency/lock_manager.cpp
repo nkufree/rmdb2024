@@ -33,7 +33,18 @@ inline std::shared_ptr<LockManager::LockRequestQueue> LockManager::get_lock_requ
     return lock_table_[lock_data_id];
 }
 
-bool LockManager::check_and_execute_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode)
+inline std::shared_ptr<LockManager::LockRequestQueue> LockManager::get_lock_request_queue(const GapLockId& lock_data_id)
+{
+    std::scoped_lock<std::mutex> lock(latch_);
+    if(gap_lock_table_.find(lock_data_id) == gap_lock_table_.end()) {
+        std::shared_ptr<LockRequestQueue> lock_request_queue = std::make_shared<LockRequestQueue>();
+        gap_lock_table_.emplace(lock_data_id, lock_request_queue);
+        lock_request_queue->group_lock_mode_ = GroupLockMode::NON_LOCK;
+    }
+    return gap_lock_table_[lock_data_id];
+}
+
+bool LockManager::check_and_add_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode)
 {
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
     if(!lock_compatible(lock_request_queue->group_lock_mode_, lock_mode)) {
@@ -69,7 +80,7 @@ bool LockManager::lock_shared_on_record(Transaction* txn, const Rid& rid, int ta
     
     // 检查是否有事务已经持有排他锁
     // 如果有事务持有排他锁，加入等待队列，等待条件变量唤醒
-    check_and_execute_lock(lock_request_queue, lock_request, txn, GroupLockMode::S);
+    check_and_add_lock(lock_request_queue, lock_request, txn, GroupLockMode::S);
     txn->get_lock_set()->insert(lock_data_id);
     return true;
 }
@@ -89,7 +100,7 @@ bool LockManager::lock_exclusive_on_record(Transaction* txn, const Rid& rid, int
     std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(lock_data_id);
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::EXLUCSIVE);
     // 检查是否有事务已经持有锁
-    check_and_execute_lock(lock_request_queue, lock_request, txn, GroupLockMode::X);
+    check_and_add_lock(lock_request_queue, lock_request, txn, GroupLockMode::X);
     txn->get_lock_set()->insert(lock_data_id);
     return true;
 }
@@ -109,7 +120,7 @@ bool LockManager::lock_shared_on_table(Transaction* txn, int tab_fd) {
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::SHARED);
     // 检查是否有事务已经持有排他锁
     // 如果有事务持有排他锁，加入等待队列，等待条件变量唤醒
-    check_and_execute_lock(lock_request_queue, lock_request, txn, GroupLockMode::S);
+    check_and_add_lock(lock_request_queue, lock_request, txn, GroupLockMode::S);
     txn->get_lock_set()->insert(lock_data_id);
     return true;
 }
@@ -128,7 +139,7 @@ bool LockManager::lock_exclusive_on_table(Transaction* txn, int tab_fd) {
     std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(lock_data_id);
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::EXLUCSIVE);
     // 检查是否有事务已经持有锁
-    check_and_execute_lock(lock_request_queue, lock_request, txn, GroupLockMode::X);
+    check_and_add_lock(lock_request_queue, lock_request, txn, GroupLockMode::X);
     txn->get_lock_set()->insert(lock_data_id);
     return true;
 }
@@ -216,7 +227,7 @@ bool LockManager::lock_IS_on_table(Transaction* txn, int tab_fd) {
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::INTENTION_SHARED);
     // 检查是否有事务已经持有排他锁
     // 如果有事务持有排他锁，加入等待队列，等待条件变量唤醒
-    check_and_execute_lock(lock_request_queue, lock_request, txn, GroupLockMode::IS);
+    check_and_add_lock(lock_request_queue, lock_request, txn, GroupLockMode::IS);
     txn->get_lock_set()->insert(lock_data_id);
     return true;
 }
@@ -235,8 +246,81 @@ bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
     std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::INTENTION_EXCLUSIVE);
     // 检查是否有事务已经持有排他锁
     // 如果有事务持有排他锁，加入等待队列，等待条件变量唤醒
-    check_and_execute_lock(lock_request_queue, lock_request, txn, GroupLockMode::IX);
+    check_and_add_lock(lock_request_queue, lock_request, txn, GroupLockMode::IX);
     txn->get_lock_set()->insert(lock_data_id);
+    return true;
+}
+
+bool LockManager::upgrade_gap_lock(Transaction* txn, const GapLockId& gap_lock_id)
+{
+    std::shared_ptr<LockRequestQueue> lock_request_queue = gap_lock_table_[gap_lock_id];
+    std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
+    std::shared_ptr<LockRequest> lock_request;
+    for(auto& tmp : lock_request_queue->request_queue_) {
+        if(tmp->txn_id_ == txn->get_transaction_id()) {
+            lock_request = tmp;
+            break;
+        }
+    }
+    if(lock_request->lock_mode_ == LockMode::EXLUCSIVE)
+        return true;
+    else
+    {
+        check_wait_die(lock_request_queue, txn);
+    }
+    if(lock_request_queue->request_queue_.size() == 1) {
+        lock_request_queue->group_lock_mode_ = GroupLockMode::X;
+        lock_request->granted_ = true;
+        lock_request->lock_mode_ = LockMode::EXLUCSIVE;
+    }
+    else {
+        std::shared_ptr<LockRequest> new_lock_request(new LockRequest(txn->get_transaction_id(), LockMode::EXLUCSIVE));
+        lock_request_queue->upgrade_queue_.emplace_back(new_lock_request);
+        lock_request_queue->cv_.wait(queue_lock, [&](){
+            return new_lock_request->granted_;
+        });
+        lock_request->lock_mode_ = LockMode::EXLUCSIVE;
+        lock_request_queue->upgrade_queue_.remove(new_lock_request);
+    }
+    return true;
+}
+
+bool LockManager::check_and_add_gap_lock(std::shared_ptr<LockRequestQueue> lock_request_queue, std::shared_ptr<LockRequest> lock_request, Transaction* txn, GroupLockMode lock_mode)
+{
+    std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
+    if(!lock_compatible(lock_request_queue->group_lock_mode_, lock_mode)) {
+        check_wait_die(lock_request_queue, txn);
+        lock_request_queue->request_queue_.emplace_back(lock_request);
+        lock_request_queue->cv_.wait(queue_lock, [&](){
+            return lock_request->granted_;
+        });
+    }
+    else
+    {
+        lock_request->granted_ = true;
+        lock_request_queue->request_queue_.emplace_back(lock_request);
+        lock_request_queue->group_lock_mode_ = lock_mode;
+    }
+    return true;
+}
+
+bool LockManager::lock_gap_shared_on_index(Transaction* txn, int index_fd, int len, std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key)
+{
+    const GapLockId gap_lock_id = GapLockId(index_fd, start_key, end_key, len);
+    if(txn->get_gap_lock_set()->find(gap_lock_id) != txn->get_gap_lock_set()->end())
+        return true;
+    std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(gap_lock_id);
+    std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::SHARED);
+    return true;
+}
+
+bool LockManager::lock_gap_exclusive_on_index(Transaction* txn, int index_fd, int len, std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key)
+{
+    const GapLockId gap_lock_id = GapLockId(index_fd, start_key, end_key, len);
+    if(txn->get_gap_lock_set()->find(gap_lock_id) != txn->get_gap_lock_set()->end())
+        return upgrade_gap_lock(txn, gap_lock_id);
+    std::shared_ptr<LockRequestQueue> lock_request_queue = get_lock_request_queue(gap_lock_id);
+    std::shared_ptr<LockRequest> lock_request = std::make_shared<LockRequest>(txn->get_transaction_id(), LockMode::EXLUCSIVE);
     return true;
 }
 
