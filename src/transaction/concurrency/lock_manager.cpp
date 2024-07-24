@@ -374,7 +374,7 @@ bool LockManager::unlock(Transaction* txn, GapLockId lock_data_id) {
         return lock_request->granted_;
     });
     if(request_queue.empty()) {
-        lock_request_queue->group_lock_mode_ = GroupLockMode::NON_LOCK;
+        gap_lock_table_.erase(lock_data_id);
     }
     else if(first_granted == request_queue.end())
     {

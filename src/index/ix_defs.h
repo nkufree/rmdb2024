@@ -163,6 +163,7 @@ public:
         last_leaf_ = *reinterpret_cast<const page_id_t*>(src + offset);
         offset += sizeof(page_id_t);
         assert(offset == tot_len_);
+        init_min_max_key();
     }
 };
 

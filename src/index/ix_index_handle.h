@@ -283,7 +283,8 @@ class IxIndexHandle {
 
     bool lock_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const;
 
-    bool lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context, bool insert=false) const;
+    bool lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const;
+    bool lock_gap_exclusive_insert(const Iid& iid, IxNodeHandle* node, Context* context, const char* insert_key) const;
 public:
     Rid get_rid(const Iid &iid, Context *context) const;
     int get_btree_order() const { return file_hdr_->btree_order_; }

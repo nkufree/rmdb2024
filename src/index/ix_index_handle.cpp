@@ -402,7 +402,7 @@ std::shared_ptr<char[]> IxIndexHandle::get_last_key(const Iid& curr, IxNodeHandl
     else
     {
         page_id_t last_page_no = node->get_prev_leaf();
-        if(last_page_no != IX_NO_PAGE)
+        if(last_page_no != IX_LEAF_HEADER_PAGE)
         {
             IxNodeHandle* last_node = fetch_node(last_page_no);
             int last_slot_no = last_node->get_size() - 1;
@@ -433,7 +433,7 @@ std::shared_ptr<char[]> IxIndexHandle::get_next_key(const Iid& curr, IxNodeHandl
     else
     {
         page_id_t next_page_no = node->get_next_leaf();
-        if(next_page_no != IX_NO_PAGE)
+        if(next_page_no != IX_LEAF_HEADER_PAGE)
         {
             IxNodeHandle* last_node = fetch_node(next_page_no);
             const char* next_key = node->get_key(0);
@@ -459,23 +459,71 @@ bool IxIndexHandle::lock_gap_shared(const Iid& iid, IxNodeHandle* node, Context*
     return res;
 }
 
-bool IxIndexHandle::lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context, bool insert) const
+bool IxIndexHandle::lock_gap_exclusive_insert(const Iid& iid, IxNodeHandle* node, Context* context, const char* insert_key) const
+{
+    IxNodeHandle* first = fetch_node(file_hdr_->first_leaf_);
+    std::shared_ptr<char[]> prev_key(new char[file_hdr_->col_tot_len_]);
+    std::shared_ptr<char[]> next_key(new char[file_hdr_->col_tot_len_]);
+    if(first->get_size() == 0)
+    {
+        memcpy(prev_key.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
+        memcpy(next_key.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
+    }
+    else
+    {
+        char* first_key = first->get_key(0);
+        if(ix_compare(insert_key, first_key, file_hdr_->col_types_, file_hdr_->col_lens_) < 0)
+        {
+            // 小于第一个节点
+            memcpy(prev_key.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
+            memcpy(next_key.get(), first_key, file_hdr_->col_tot_len_);
+        }
+        else
+        {
+            IxNodeHandle* last = fetch_node(file_hdr_->last_leaf_);
+            char* last_key = last->get_key(last->get_size() - 1);
+            if(ix_compare(insert_key, first_key, file_hdr_->col_types_, file_hdr_->col_lens_) > 0)
+            {
+                // 大于最后一个节点
+                memcpy(prev_key.get(), last_key, file_hdr_->col_tot_len_);
+                memcpy(next_key.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
+            }
+            else
+            {
+                // 在中间
+                prev_key = get_last_key(iid, node);
+                if(iid.slot_no < node->get_size() - 1)
+                {
+                    char* tmp = node->get_key(iid.slot_no);
+                    memcpy(next_key.get(), tmp, file_hdr_->col_tot_len_);
+                }
+                else
+                {
+                    page_id_t next_page_no = node->get_next_leaf();
+                    assert(next_page_no != IX_LEAF_HEADER_PAGE);
+                    IxNodeHandle* next = fetch_node(next_page_no);
+                    char* tmp = next->get_key(0);
+                    memcpy(next_key.get(), tmp, file_hdr_->col_tot_len_);
+                    buffer_pool_manager_->unpin_page(next->get_page_id(), false);
+                }
+            }
+            buffer_pool_manager_->unpin_page(last->get_page_id(), false);
+        }
+    }
+    bool res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, prev_key, next_key);
+    buffer_pool_manager_->unpin_page(first->get_page_id(), false);
+    return res;
+}
+
+bool IxIndexHandle::lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const
 {
     std::shared_ptr<char[]> curr_key(new char[file_hdr_->col_tot_len_]);
     memcpy(curr_key.get(), node->get_key(iid.slot_no), file_hdr_->col_tot_len_);
     bool res;
-    if(insert)
-    {
-        auto last_key = get_last_key(iid, node);
-        res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, curr_key);
-    }
-    else
-    {
-        auto last_key = get_last_key(iid, node);
-        auto next_key = get_next_key(iid, node);
-        res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, curr_key);
-        res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, curr_key, next_key);
-    }
+    auto last_key = get_last_key(iid, node);
+    auto next_key = get_next_key(iid, node);
+    res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, curr_key);
+    res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, curr_key, next_key);
     return res;
 }
 
@@ -500,7 +548,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     std::unique_ptr<IxNodeHandle> node(leaf.first);
     int prev_num_key = node->get_size();
     int pos = node->lower_bound(key);
-    lock_gap_exclusive({node->get_page_no(), pos}, node.get(), context, true);
+    lock_gap_exclusive_insert({node->get_page_no(), pos}, node.get(), context, key);
     int num_key = node->insert(key, value);
     if(num_key == prev_num_key)
     {
