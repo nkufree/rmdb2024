@@ -387,6 +387,29 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     // std::cout << "End Insert into parent" << std::endl;
 }
 
+bool IxIndexHandle::add_gap_lock(Transaction* txn, const char* start_key, const char* end_key)
+{
+    if(memcmp(start_key, end_key, file_hdr_->col_tot_len_) == 0)
+        return true;
+    // TODO: add gap lock
+    // 1. 查找相交的区间，记录相交方式（包含、被包含、相交（左），相交（右））
+    // 2. 划分区间，保证最后的锁中没有相交的区间
+}
+
+bool IxIndexHandle::gap_unlock(Transaction* txn, GapLockId& gap_lock_id)
+{
+    // TODO: 释放锁
+    // 这里不能简单地删除，因为在添加锁时有可能会将锁分开
+    // 需要依次遍历删除锁
+}
+
+bool IxIndexHandle::is_in_gap(GapLockId gap_lock_id, const char* key) const
+{
+    char* start_key = gap_lock_id.start_key_.get();
+    char* end_key = gap_lock_id.end_key_.get();
+    return ix_compare(start_key, key, file_hdr_->col_types_, file_hdr_->col_lens_) < 0 && ix_compare(key, end_key, file_hdr_->col_types_, file_hdr_->col_lens_) <= 0;
+}
+
 std::shared_ptr<char[]> IxIndexHandle::get_last_key(const Iid& curr, IxNodeHandle* node) const
 {
     std::shared_ptr<char[]> res(new char[file_hdr_->col_tot_len_]);;
@@ -448,88 +471,174 @@ std::shared_ptr<char[]> IxIndexHandle::get_next_key(const Iid& curr, IxNodeHandl
     return res;
 }
 
-bool IxIndexHandle::lock_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const
+bool IxIndexHandle::check_gap_locked(Transaction* txn, const char* key, std::shared_ptr<GapLockRequestQueue>& request_queue)
 {
-    auto last_key = get_last_key(iid, node);
-    std::shared_ptr<char[]> curr_key(new char[file_hdr_->col_tot_len_]);
-    memcpy(curr_key.get(), node->get_key(iid.slot_no), file_hdr_->col_tot_len_);
-    auto next_key = get_next_key(iid, node);
-    bool res = context->lock_mgr_->lock_gap_shared_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, curr_key);
-    res = context->lock_mgr_->lock_gap_shared_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, curr_key, next_key);
-    return res;
-}
-
-bool IxIndexHandle::lock_gap_exclusive_insert(const Iid& iid, IxNodeHandle* node, Context* context, const char* insert_key) const
-{
-    IxNodeHandle* first = fetch_node(file_hdr_->first_leaf_);
-    std::shared_ptr<char[]> prev_key(new char[file_hdr_->col_tot_len_]);
-    std::shared_ptr<char[]> next_key(new char[file_hdr_->col_tot_len_]);
-    if(first->get_size() == 0)
+    bool res = true;
+    for(auto& item : gap_lock_table_)
     {
-        memcpy(prev_key.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
-        memcpy(next_key.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
-    }
-    else
-    {
-        char* first_key = first->get_key(0);
-        if(ix_compare(insert_key, first_key, file_hdr_->col_types_, file_hdr_->col_lens_) < 0)
+        if(is_in_gap(item.first, key))
         {
-            // 小于第一个节点
-            memcpy(prev_key.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
-            memcpy(next_key.get(), first_key, file_hdr_->col_tot_len_);
-        }
-        else
-        {
-            IxNodeHandle* last = fetch_node(file_hdr_->last_leaf_);
-            char* last_key = last->get_key(last->get_size() - 1);
-            if(ix_compare(insert_key, first_key, file_hdr_->col_types_, file_hdr_->col_lens_) > 0)
+            if(item.second->request_queue_.size() == 1 && item.second->request_queue_.front()->txn_id_ == txn->get_transaction_id())
             {
-                // 大于最后一个节点
-                memcpy(prev_key.get(), last_key, file_hdr_->col_tot_len_);
-                memcpy(next_key.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
+                res = false;
             }
             else
             {
-                // 在中间
-                prev_key = get_last_key(iid, node);
-                if(iid.slot_no < node->get_size() - 1)
-                {
-                    char* tmp = node->get_key(iid.slot_no);
-                    memcpy(next_key.get(), tmp, file_hdr_->col_tot_len_);
-                }
-                else
-                {
-                    page_id_t next_page_no = node->get_next_leaf();
-                    assert(next_page_no != IX_LEAF_HEADER_PAGE);
-                    IxNodeHandle* next = fetch_node(next_page_no);
-                    char* tmp = next->get_key(0);
-                    memcpy(next_key.get(), tmp, file_hdr_->col_tot_len_);
-                    buffer_pool_manager_->unpin_page(next->get_page_id(), false);
-                }
+                request_queue = item.second;
             }
-            buffer_pool_manager_->unpin_page(last->get_page_id(), false);
+            break;
         }
     }
-    bool res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, prev_key, next_key);
-    buffer_pool_manager_->unpin_page(first->get_page_id(), false);
     return res;
+
 }
 
-bool IxIndexHandle::lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const
-{
-    std::shared_ptr<char[]> curr_key(new char[file_hdr_->col_tot_len_]);
-    memcpy(curr_key.get(), node->get_key(iid.slot_no), file_hdr_->col_tot_len_);
-    bool res;
-    auto last_key = get_last_key(iid, node);
-    auto next_key = get_next_key(iid, node);
-    res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, curr_key);
-    res = context->lock_mgr_->lock_gap_exclusive_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, curr_key, next_key);
-    return res;
-}
+// bool IxIndexHandle::lock_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context)
+// {
+//     auto last_key = get_last_key(iid, node);
+//     std::shared_ptr<char[]> curr_key(new char[file_hdr_->col_tot_len_]);
+//     memcpy(curr_key.get(), node->get_key(iid.slot_no), file_hdr_->col_tot_len_);
+//     auto next_key = get_next_key(iid, node);
+//     bool res = context->lock_mgr_->lock_gap_shared_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, last_key, curr_key);
+//     res = context->lock_mgr_->lock_gap_shared_on_index(context->txn_, fd_, file_hdr_->col_tot_len_, curr_key, next_key);
+//     return res;
+// }
 
-page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context) {
+// void IxIndexHandle::find_insert_gap(Transaction* txn, const char* insert_key, std::shared_ptr<char[]> prev_key, std::shared_ptr<char[]> next_key)
+// {
+//     IxNodeHandle* node = find_leaf_page(insert_key, Operation::INSERT, txn).first;
+//     int pos = node->lower_bound(insert_key);
+//     Iid iid = {node->get_page_no(), pos};
+//     IxNodeHandle* first = fetch_node(file_hdr_->first_leaf_);
+//     if(first->get_size() == 0)
+//     {
+//         memcpy(prev_key.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
+//         memcpy(next_key.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
+//     }
+//     else
+//     {
+//         char* first_key = first->get_key(0);
+//         if(ix_compare(insert_key, first_key, file_hdr_->col_types_, file_hdr_->col_lens_) < 0)
+//         {
+//             // 小于第一个节点
+//             memcpy(prev_key.get(), file_hdr_->min_key_, file_hdr_->col_tot_len_);
+//             memcpy(next_key.get(), first_key, file_hdr_->col_tot_len_);
+//         }
+//         else
+//         {
+//             IxNodeHandle* last = fetch_node(file_hdr_->last_leaf_);
+//             char* last_key = last->get_key(last->get_size() - 1);
+//             if(ix_compare(insert_key, first_key, file_hdr_->col_types_, file_hdr_->col_lens_) > 0)
+//             {
+//                 // 大于最后一个节点
+//                 memcpy(prev_key.get(), last_key, file_hdr_->col_tot_len_);
+//                 memcpy(next_key.get(), file_hdr_->max_key_, file_hdr_->col_tot_len_);
+//             }
+//             else
+//             {
+//                 // 在中间
+//                 prev_key = get_last_key(iid, node);
+//                 if(iid.slot_no < node->get_size() - 1)
+//                 {
+//                     char* tmp = node->get_key(iid.slot_no);
+//                     memcpy(next_key.get(), tmp, file_hdr_->col_tot_len_);
+//                 }
+//                 else
+//                 {
+//                     page_id_t next_page_no = node->get_next_leaf();
+//                     assert(next_page_no != IX_LEAF_HEADER_PAGE);
+//                     IxNodeHandle* next = fetch_node(next_page_no);
+//                     char* tmp = next->get_key(0);
+//                     memcpy(next_key.get(), tmp, file_hdr_->col_tot_len_);
+//                     buffer_pool_manager_->unpin_page(next->get_page_id(), false);
+//                 }
+//             }
+//             buffer_pool_manager_->unpin_page(last->get_page_id(), false);
+//         }
+//     }
+//     buffer_pool_manager_->unpin_page(first->get_page_id(), false);
+// }
+
+// bool IxIndexHandle::insert_recursion(Transaction* txn, const char* insert_key, std::shared_ptr<char[]> prev_key, std::shared_ptr<char[]> next_key, std::shared_ptr<GapLockRequest> request)
+// {
+//     find_insert_gap(txn, insert_key, prev_key, next_key);
+//     bool res = lock_gap_exclusive_by_range(prev_key, next_key, txn, request);
+//     if(!res)
+//     {
+//         // 加锁失败，回到索引的全局请求队列，等待唤醒
+//         std::unique_lock<std::mutex> lock(global_gap_lock_queue_->latch_);
+//         global_gap_lock_queue_->request_queue_.emplace_back(request);
+//         global_gap_lock_queue_->cv_.wait(lock, [&](){
+//             return request->granted_;
+//         });
+//         return insert_recursion(txn, insert_key, prev_key, next_key, request);
+//     }
+// }
+
+// bool IxIndexHandle::lock_gap_exclusive_insert(Transaction* txn, const char* insert_key)
+// {
+    
+//     std::shared_ptr<GapLockRequest> request = std::make_shared<GapLockRequest>(txn->get_transaction_id(), GapLockMode::X);
+//     std::shared_ptr<char[]> prev_key(new char[file_hdr_->col_tot_len_]);
+//     std::shared_ptr<char[]> next_key(new char[file_hdr_->col_tot_len_]);
+//     find_insert_gap(txn, insert_key, prev_key, next_key);
+//     return 
+// }
+
+// bool IxIndexHandle::lock_gap_exclusive_delete(Transaction* txn, const char* delete_key)
+// {
+//     std::shared_ptr<char[]> curr_key(new char[file_hdr_->col_tot_len_]);
+//     memcpy(curr_key.get(), node->get_key(iid.slot_no), file_hdr_->col_tot_len_);
+//     bool res;
+//     auto last_key = get_last_key(iid, node);
+//     auto next_key = get_next_key(iid, node);
+//     res = lock_gap_exclusive_by_range(last_key, curr_key, txn);
+//     res = lock_gap_exclusive_by_range(curr_key, next_key, txn);
+//     return res;
+// }
+
+// bool IxIndexHandle::lock_gap_exclusive_by_range(std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key, Transaction* txn, std::shared_ptr<GapLockRequest> request)
+// {
+//     GapLockId gap_lock_id(fd_, start_key, end_key, file_hdr_->col_tot_len_);
+//     if(txn->get_gap_lock_set()->find(gap_lock_id) != txn->get_gap_lock_set()->end())
+//     {
+//         return upgrade_gap_lock(txn, gap_lock_id, request);
+//     }
+//     std::shared_ptr<GapLockRequestQueue> request_queue;
+//     std::scoped_lock<std::mutex> lock(gap_lock_table_latch_);
+//     if(gap_lock_table_.find(gap_lock_id) != gap_lock_table_.end())
+//     {
+//         request_queue = gap_lock_table_[gap_lock_id];
+//     }
+//     else
+//     {
+//         request_queue = std::make_shared<GapLockRequestQueue>();
+//         gap_lock_table_.emplace(gap_lock_id, request_queue);
+//         request_queue->group_lock_mode_ = GapLockMode::NON_LOCK;
+//     }
+//     std::unique_lock<std::mutex> request_lock(request_queue->latch_);
+//     if(request_queue->group_lock_mode_ == GapLockMode::NON_LOCK)
+//     {
+//         request_queue->group_lock_mode_ = GapLockMode::X;
+//         request_queue->request_queue_.emplace_back(request);
+//     }
+//     else if(request_queue->group_lock_mode_ == GapLockMode::S)
+//     {
+//         request_queue->upgrade_queue_.emplace_back(request);
+//         request_queue->cv_.wait(request_lock, [&](){
+//             return request->granted_;
+//         });
+//     }
+//     else
+//     {
+//         return false;
+//     }
+//     return true;
+// }
+
+page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction) {
     bool success;
-    return insert_entry(key, value, transaction, context, &success);
+    return insert_entry(key, value, transaction, &success);
 }
 
 /**
@@ -538,7 +647,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
  * @param transaction 事务指针
  * @return page_id_t 插入到的叶结点的page_no
  */
-page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context, bool* success) {
+page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success) {
     // Todo:
     // 1. 查找key值应该插入到哪个叶子节点
     // 2. 在该叶子节点中插入键值对
@@ -547,9 +656,20 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::INSERT, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
     int prev_num_key = node->get_size();
-    int pos = node->lower_bound(key);
-    lock_gap_exclusive_insert({node->get_page_no(), pos}, node.get(), context, key);
+    std::shared_ptr<GapLockRequestQueue> request_queue;
+    std::unique_lock<std::mutex> lock(gap_lock_table_latch_);
+    bool is_locked = check_gap_locked(transaction, key, request_queue);
+    if(is_locked)
+    {
+        std::shared_ptr<GapLockRequest> request = std::make_shared<GapLockRequest>(transaction->get_transaction_id());
+        request_queue->wait_queue_.emplace_back(request);
+        request_queue->cv_.wait(lock, [&](){
+            return request->granted_;
+        });
+    }
     int num_key = node->insert(key, value);
+    lock.unlock();
+
     if(num_key == prev_num_key)
     {
         buffer_pool_manager_->unpin_page(node->get_page_id(), true);
@@ -575,7 +695,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
  * @param key 要删除的key值
  * @param transaction 事务指针
  */
-bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction, Context *context) {
+bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
     // Todo:
     // 1. 获取该键值对所在的叶子结点
     // 2. 在该叶子结点中删除键值对
@@ -583,9 +703,19 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction, Cont
     // 4. 如果需要并发，并且需要删除叶子结点，则需要在事务的delete_page_set中添加删除结点的对应页面；记得处理并发的上锁
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::DELETE, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
-    int pos = node->lower_bound(key);
-    lock_gap_exclusive({node->get_page_no(), pos}, node.get(), context);
+    std::shared_ptr<GapLockRequestQueue> request_queue;
+    std::unique_lock<std::mutex> lock(gap_lock_table_latch_);
+    bool is_locked = check_gap_locked(transaction, key, request_queue);
+    if(is_locked)
+    {
+        std::shared_ptr<GapLockRequest> request = std::make_shared<GapLockRequest>(transaction->get_transaction_id());
+        request_queue->wait_queue_.emplace_back(request);
+        request_queue->cv_.wait(lock, [&](){
+            return request->granted_;
+        });
+    }
     node->remove(key);
+    lock.unlock();
     if(node->lower_bound(key) == 0)
         maintain_parent(node.get());
     bool root_is_latched = false;
@@ -819,7 +949,6 @@ bool IxIndexHandle::coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, 
  */
 Rid IxIndexHandle::get_rid(const Iid &iid, Context *context) const {
     IxNodeHandle *node = fetch_node(iid.page_no);
-    lock_gap_shared(iid, node, context);
     if (iid.slot_no >= node->get_size()) {
         throw IndexEntryNotFoundError();
     }

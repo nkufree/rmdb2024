@@ -204,11 +204,55 @@ class IxNodeHandle {
     }
 };
 
+class GapLockId {
+public:
+    GapLockId(int fd, std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key, int len) : fd_(fd), start_key_(start_key), end_key_(end_key) ,len_(len){}
+    
+    inline int64_t Get() const {
+        return ((static_cast<int64_t>(fd_)) << 32) | (static_cast<int32_t>(*(int*)start_key_.get()));
+    }
+    
+    bool operator==(const GapLockId &other) const {
+        if (fd_ != other.fd_) return false;
+        return memcmp(start_key_.get(), other.start_key_.get(), len_) == 0;
+    }
+    
+    int fd_;
+    std::shared_ptr<char[]> start_key_;
+    std::shared_ptr<char[]> end_key_;
+    int len_;
+};
+
+template <>
+struct std::hash<GapLockId> {
+    size_t operator()(const GapLockId &obj) const { return std::hash<int64_t>()(obj.Get()); }
+};
+
 /* B+树 */
 class IxIndexHandle {
     friend class IxScan;
     friend class IxManager;
+private:
 
+    class GapLockRequest {
+    public:
+        GapLockRequest(txn_id_t txn_id)
+            : txn_id_(txn_id), granted_(false) {}
+
+        txn_id_t txn_id_;   // 申请加锁的事务ID
+        bool granted_;          // 该事务是否已经被赋予锁
+    };
+
+    class GapLockRequestQueue {
+    public:
+        std::list<std::shared_ptr<GapLockRequest>> request_queue_;  // 加锁队列
+        std::list<std::shared_ptr<GapLockRequest>> wait_queue_;  // 等待队列
+        std::condition_variable cv_;            // 条件变量，用于唤醒正在等待加锁的申请，在no-wait策略下无需使用
+        GapLockRequestQueue() = default;
+    };
+    std::unordered_map<GapLockId, std::shared_ptr<GapLockRequestQueue>> gap_lock_table_;
+    std::mutex gap_lock_table_latch_;
+    std::shared_ptr<GapLockRequestQueue> global_gap_lock_queue_;
    private:
     DiskManager *disk_manager_;
     BufferPoolManager *buffer_pool_manager_;
@@ -226,15 +270,15 @@ class IxIndexHandle {
                                                  bool find_first = false);
 
     // for insert
-    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context, bool* success);
-    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, Context *context);
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success);
+    page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
 
     IxNodeHandle *split(IxNodeHandle *node);
 
     void insert_into_parent(IxNodeHandle *old_node, const char *key, IxNodeHandle *new_node, Transaction *transaction);
 
     // for delete
-    bool delete_entry(const char *key, Transaction *transaction, Context *context);
+    bool delete_entry(const char *key, Transaction *transaction);
 
     bool coalesce_or_redistribute(IxNodeHandle *node, Transaction *transaction = nullptr,
                                 bool *root_is_latched = nullptr);
@@ -281,10 +325,27 @@ class IxIndexHandle {
     std::shared_ptr<char[]> get_last_key(const Iid& curr, IxNodeHandle* node) const;
     std::shared_ptr<char[]> get_next_key(const Iid& curr, IxNodeHandle* node) const;
 
-    bool lock_gap_shared(const Iid& iid, IxNodeHandle* node, Context* context) const;
+    // bool lock_gap_shared(const Iid& iid, IxNodeHandle* node, Transaction* txn);
 
-    bool lock_gap_exclusive(const Iid& iid, IxNodeHandle* node, Context* context) const;
-    bool lock_gap_exclusive_insert(const Iid& iid, IxNodeHandle* node, Context* context, const char* insert_key) const;
+    // bool lock_gap_exclusive_delete(Transaction* txn, const char* delete_key);
+
+    // bool lock_gap_exclusive_insert(Transaction* txn, const char* insert_key);
+
+    // bool lock_gap_exclusive_by_range(std::shared_ptr<char[]> start_key, std::shared_ptr<char[]> end_key, Transaction* txn, std::shared_ptr<GapLockRequest> request);
+
+    bool is_in_gap(GapLockId gap_lock_id, const char* key) const;
+
+    // bool upgrade_gap_lock(Transaction* txn, GapLockId gap_lock_id, std::shared_ptr<GapLockRequest> request);
+
+    // void find_insert_gap(Transaction* txn, const char* insert_key, std::shared_ptr<char[]> prev_key, std::shared_ptr<char[]> next_key);
+
+    bool check_gap_locked(Transaction* txn, const char* key, std::shared_ptr<GapLockRequestQueue>& request_queue);
+
+    bool add_gap_lock(Transaction* txn, const char* start_key, const char* end_key);
+
+    bool gap_unlock(Transaction* txn, GapLockId& gap_lock_id);
+
+    // bool IxIndexHandle::insert_recursion(Transaction* txn, const char* insert_key, std::shared_ptr<char[]> prev_key, std::shared_ptr<char[]> next_key, std::shared_ptr<GapLockRequest> request);
 public:
     Rid get_rid(const Iid &iid, Context *context) const;
     int get_btree_order() const { return file_hdr_->btree_order_; }

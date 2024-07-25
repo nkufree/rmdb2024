@@ -56,7 +56,6 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     txn->get_write_set()->clear();
     for(auto it = txn->get_gap_lock_set()->begin(); it != txn->get_gap_lock_set()->end();)
     {
-        lock_manager_->unlock(txn, *it);
         it = txn->get_gap_lock_set()->erase(it);
     }
     for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
@@ -129,13 +128,13 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
                 switch (type)
                 {
                 case WType::INSERT_TUPLE:
-                    ih->delete_entry(key, txn, &context);
+                    ih->delete_entry(key, txn);
                     break;
                 case WType::DELETE_TUPLE:
-                    ih->insert_entry(key, write_record->GetRid(), txn, &context);
+                    ih->insert_entry(key, write_record->GetRid(), txn);
                     break;
                 case WType::UPDATE_TUPLE:
-                    ih->delete_entry(key, txn, &context);
+                    ih->delete_entry(key, txn);
                     old_rec = write_record->GetRecord().data;
                     offset = 0;
                     for (size_t j = 0; j < (size_t)index.col_num; ++j)
@@ -143,7 +142,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
                         memcpy(old_key + offset, old_rec + index.cols[j].offset, index.cols[j].len);
                         offset += index.cols[j].len;
                     }
-                    ih->insert_entry(old_key, write_record->GetRid(), txn, &context);
+                    ih->insert_entry(old_key, write_record->GetRid(), txn);
                     break;
                 default:
                     break;
@@ -171,7 +170,6 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     }
     for(auto it = txn->get_gap_lock_set()->begin(); it != txn->get_gap_lock_set()->end();)
     {
-        lock_manager_->unlock(txn, *it);
         it = txn->get_gap_lock_set()->erase(it);
     }
     // 释放锁
