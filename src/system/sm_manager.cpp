@@ -356,3 +356,8 @@ void SmManager::show_index(const std::string& tab_name, Context* context) {
     }
     outfile.close();
 }
+
+void SmManager::create_static_checkpoint(Context* context)
+{
+    
+}

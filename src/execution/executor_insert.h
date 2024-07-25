@@ -58,7 +58,15 @@ class InsertExecutor : public AbstractExecutor {
                 memcpy(rec.data + col.offset, val.raw->data, col.len);
             }
             // Insert into record file
-            rid_ = fh_->insert_record(rec.data, context_);
+            // 写入日志
+            rid_ = fh_->get_free_record(context_);
+            InsertLogRecord log_record(context_->txn_->get_transaction_id(), rec, rid_, tab_name_);
+            log_record.prev_lsn_ = context_->txn_->get_prev_lsn();
+            lsn_t curr_lsn = context_->log_mgr_->add_log_to_buffer(&log_record);
+            context_->txn_->set_prev_lsn(curr_lsn);
+            // 加锁
+            context_->lock_mgr_->lock_exclusive_on_table(context_->txn_, fh_->GetFd());
+            fh_->insert_record(rid_, rec.data);
             WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE, tab_name_, rid_);
             context_->txn_->append_write_record(wr);
             // Insert into index

@@ -26,6 +26,10 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     // 2. 如果为空指针，创建新事务
     // 3. 把开始事务加入到全局事务表中
     // 4. 返回当前事务指针
+    BeginLogRecord log_record(txn->get_transaction_id());
+    log_record.prev_lsn_ = txn->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    txn->set_prev_lsn(curr_lsn);
     Transaction* res;
     if(txn != nullptr) {
         return txn;
@@ -53,6 +57,10 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
     std::scoped_lock lock(latch_);
+    CommitLogRecord log_record(txn->get_transaction_id());
+    log_record.prev_lsn_ = txn->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    txn->set_prev_lsn(curr_lsn);
     txn->get_write_set()->clear();
     for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
     {
@@ -85,7 +93,10 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
     std::scoped_lock lock(latch_);
-
+    AbortLogRecord log_record(txn->get_transaction_id());
+    log_record.prev_lsn_ = txn->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    txn->set_prev_lsn(curr_lsn);
     Context context(lock_manager_, log_manager, txn);
     auto write_set = txn->get_write_set();
     while (!write_set->empty())

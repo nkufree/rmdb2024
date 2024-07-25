@@ -29,6 +29,18 @@ std::unique_ptr<RmRecord> RmFileHandle::get_record(const Rid& rid, Context* cont
     return record;
 }
 
+Rid RmFileHandle::get_free_record(Context* context)
+{
+    RmPageHandle page_handle = create_page_handle();
+    int slot_no = Bitmap::first_bit(0, page_handle.bitmap, file_hdr_.num_records_per_page);
+    if(slot_no == file_hdr_.num_records_per_page) {
+        throw InternalError("No free slot in page");
+    }
+    PageId page_id = page_handle.page->get_page_id();
+    buffer_pool_manager_->unpin_page(page_id, true);
+    return {page_id.page_no, slot_no};
+}
+
 /**
  * @description: 在当前表中插入一条记录，不指定插入位置
  * @param {char*} buf 要插入的记录的数据
@@ -56,8 +68,9 @@ Rid RmFileHandle::insert_record(char* buf, Context* context) {
         page_handle.page_hdr->next_free_page_no = RM_NO_PAGE;
     }
     Bitmap::set(page_handle.bitmap, slot_no);
-    buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
-    return {page_handle.page->get_page_id().page_no, slot_no};
+    PageId page_id = page_handle.page->get_page_id();
+    buffer_pool_manager_->unpin_page(page_id, true);
+    return {page_id.page_no, slot_no};
 }
 
 /**

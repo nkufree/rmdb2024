@@ -50,6 +50,10 @@ class DeleteExecutor : public AbstractExecutor {
             }
             if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
                 continue;
+            DeleteLogRecord log_record(context_->txn_->get_transaction_id(), *rec, rid, tab_name_);
+            log_record.prev_lsn_ = context_->txn_->get_prev_lsn();
+            lsn_t curr_lsn = context_->log_mgr_->add_log_to_buffer(&log_record);
+            context_->txn_->set_prev_lsn(curr_lsn);
             fh_->delete_record(rid, context_);
             WriteRecord* wr = new WriteRecord(WType::DELETE_TUPLE, tab_name_, rid, *rec.get());
             context_->txn_->append_write_record(wr);
