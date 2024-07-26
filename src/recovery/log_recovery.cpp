@@ -49,30 +49,34 @@ void RecoveryManager::analyze() {
             std::shared_ptr<BeginLogRecord> log_record = std::make_shared<BeginLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
-            undo_txn_.emplace(log_record->log_tid_);
+            undo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
             txn_list_.push_back(log_record->log_tid_);
         } else if(base_record.log_type_ == LogType::commit) {
             std::shared_ptr<CommitLogRecord> log_record = std::make_shared<CommitLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
-            redo_txn_.emplace(log_record->log_tid_);
+            redo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
             undo_txn_.erase(log_record->log_tid_);
         } else if(base_record.log_type_ == LogType::ABORT) {
             std::shared_ptr<AbortLogRecord> log_record = std::make_shared<AbortLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
         } else if(base_record.log_type_ == LogType::UPDATE) {
             std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
         } else if(base_record.log_type_ == LogType::INSERT) {
             std::shared_ptr<InsertLogRecord> log_record = std::make_shared<InsertLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
         } else if(base_record.log_type_ == LogType::DELETE) {
             std::shared_ptr<DeleteLogRecord> log_record = std::make_shared<DeleteLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
         }
         buffer_.offset_ += base_record.log_tot_len_;
     }
@@ -165,21 +169,21 @@ void RecoveryManager::undo() {
         txn_id_t txn_id = *it;
         while(txn_id != INVALID_LSN)
         {
-            auto& log_record = log_records_[txn_id];
+            auto& log_record = log_records_[undo_txn_[txn_id]];
             if(log_record->log_type_ == LogType::UPDATE)
             {
                 std::shared_ptr<UpdateLogRecord> update_log_record = std::dynamic_pointer_cast<UpdateLogRecord>(log_record);
-                RmFileHandle* table_file = sm_manager_->fhs_[update_log_record->table_name_].get();
+                RmFileHandle* table_file = sm_manager_->fhs_[std::string(update_log_record->table_name_, update_log_record->table_name_size_)].get();
                 table_file->update_record(update_log_record->rid_, update_log_record->before_value_.data, nullptr);
             } else if(log_record->log_type_ == LogType::INSERT)
             {
                 std::shared_ptr<InsertLogRecord> insert_log_record = std::dynamic_pointer_cast<InsertLogRecord>(log_record);
-                RmFileHandle* table_file = sm_manager_->fhs_[insert_log_record->table_name_].get();
+                RmFileHandle* table_file = sm_manager_->fhs_[std::string(insert_log_record->table_name_, insert_log_record->table_name_size_)].get();
                 table_file->delete_record(insert_log_record->rid_, nullptr);
             } else if(log_record->log_type_ == LogType::DELETE)
             {
                 std::shared_ptr<DeleteLogRecord> delete_log_record = std::dynamic_pointer_cast<DeleteLogRecord>(log_record);
-                RmFileHandle* table_file = sm_manager_->fhs_[delete_log_record->table_name_].get();
+                RmFileHandle* table_file = sm_manager_->fhs_[std::string(delete_log_record->table_name_, delete_log_record->table_name_size_)].get();
                 table_file->insert_record(delete_log_record->rid_, delete_log_record->delete_value_.data);
             }
             txn_id = log_record->prev_lsn_;
