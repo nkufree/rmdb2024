@@ -46,7 +46,7 @@ void LogManager::flush_log_to_disk() {
 
 
 lsn_t LogManager::add_static_CKPT(LogRecord* log_record) {
-    exit(0);
+    // exit(0);
     std::unique_lock<std::mutex> lock(latch_);
     log_record->lsn_ = global_lsn_;
     global_lsn_++;

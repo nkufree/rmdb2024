@@ -30,7 +30,7 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     if(txn != nullptr) {
         return txn;
     }
-    std::scoped_lock<std::mutex> lock(latch_);
+    std::unique_lock<std::shared_mutex> lock(latch_);
     res = new Transaction(next_txn_id_);
     txn_map[next_txn_id_] = res;
     res->set_start_ts(next_timestamp_);
@@ -193,7 +193,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
 void TransactionManager::create_static_checkpoint(Context* context, SmManager* sm_manager)
 {
     // 停止接受新事务
-    std::scoped_lock<std::mutex> lock(latch_);
+    std::shared_lock<std::shared_mutex> lock(latch_);
     this->commit(context->txn_, context->log_mgr_);
     // 等待现有事务完成
     std::mutex mtx;
