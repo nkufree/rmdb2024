@@ -300,3 +300,36 @@ void DiskManager::write_log(char *log_data, int size)
         throw UnixError();
     }
 }
+
+int DiskManager::get_log_size()
+{
+    int file_size = get_file_size(LOG_FILE_NAME);
+    return file_size;
+}
+
+void DiskManager::set_restart_log(int offset)
+{
+    if (restart_fd_ == -1)
+    {
+        restart_fd_ = open_file(RESTART_FILE_NAME);
+    }
+    lseek(restart_fd_, 0, SEEK_SET);
+    write(restart_fd_, &offset, sizeof(offset));
+}
+
+int DiskManager::get_restart_log()
+{
+    if (restart_fd_ == -1)
+    {
+        restart_fd_ = open_file(RESTART_FILE_NAME);
+    }
+    lseek(restart_fd_, 0, SEEK_SET);
+    int res;
+    int file_size = get_file_size(RESTART_FILE_NAME);
+    if(file_size < sizeof(int))
+    {
+        return 0;
+    }
+    read(restart_fd_, &res, sizeof(int));
+    return res;
+}

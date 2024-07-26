@@ -56,7 +56,6 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 3. 释放事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    std::scoped_lock lock(latch_);
     CommitLogRecord log_record(txn->get_transaction_id());
     log_record.prev_lsn_ = txn->get_prev_lsn();
     lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
@@ -79,6 +78,7 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     }
     log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::COMMITTED);
+    cv_.notify_all();
 }
 
 /**
@@ -93,7 +93,6 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 3. 清空事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    std::scoped_lock lock(latch_);
     AbortLogRecord log_record(txn->get_transaction_id());
     log_record.prev_lsn_ = txn->get_prev_lsn();
     lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
@@ -188,4 +187,26 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     }
     log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::ABORTED);
+    cv_.notify_all();
+}
+
+void TransactionManager::create_static_checkpoint(Context* context, SmManager* sm_manager)
+{
+    // 停止接受新事务
+    std::scoped_lock<std::mutex> lock(latch_);
+    this->commit(context->txn_, context->log_mgr_);
+    // 等待现有事务完成
+    std::mutex mtx;
+    std::unique_lock<std::mutex> lck(mtx);
+    cv_.wait(lck, [&]() {
+        return std::all_of(txn_map.begin(), txn_map.end(), [&](const auto& pair) {
+            return pair.second->get_state() == TransactionState::COMMITTED || pair.second->get_state() == TransactionState::ABORTED;
+        });
+    });
+    // 刷新磁盘
+    sm_manager->flush_all_pages();
+    // 添加日志
+    StaticCKPTLogRecord log_record;
+    context->log_mgr_->add_static_CKPT(&log_record);
+
 }

@@ -14,8 +14,8 @@ See the Mulan PSL v2 for more details. */
  * @description: analyze阶段，需要获得脏页表（DPT）和未完成的事务列表（ATT）
  */
 void RecoveryManager::analyze() {
-    last_checkpoint_lsn_ = INVALID_LSN;
-    int offset = 0;
+    last_checkpoint_ = disk_manager_->get_restart_log();
+    int offset = last_checkpoint_;
     LogRecord base_record;
     int buffer_size = disk_manager_->read_log(buffer_.buffer_, LOG_BUFFER_SIZE, offset);
     while(true)
@@ -44,7 +44,6 @@ void RecoveryManager::analyze() {
             std::shared_ptr<StaticCKPTLogRecord> log_record = std::make_shared<StaticCKPTLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
-            last_checkpoint_lsn_ = base_record.lsn_;
         } else if(base_record.log_type_ == LogType::begin) {
             std::shared_ptr<BeginLogRecord> log_record = std::make_shared<BeginLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
@@ -82,11 +81,6 @@ void RecoveryManager::analyze() {
     }
     // 将事务执行的操作按顺序分配到各个页面上
     std::map<lsn_t, std::shared_ptr<LogRecord>>::iterator it = log_records_.begin();
-    if(last_checkpoint_lsn_ != INVALID_LSN)
-    {
-        it = log_records_.find(last_checkpoint_lsn_);
-        it++;
-    }
     for(;it != log_records_.end(); it++)
     {
         auto& log_record = it->second;
@@ -167,9 +161,12 @@ void RecoveryManager::undo() {
     for(auto it = undo_txn_list.rbegin(); it != undo_txn_list.rend(); it++)
     {
         txn_id_t txn_id = *it;
+        lsn_t curr_lsn = undo_txn_[txn_id];
         while(txn_id != INVALID_LSN)
         {
-            auto& log_record = log_records_[undo_txn_[txn_id]];
+            auto& log_record = log_records_[curr_lsn];
+            if(!log_record)
+                break;
             if(log_record->log_type_ == LogType::UPDATE)
             {
                 std::shared_ptr<UpdateLogRecord> update_log_record = std::dynamic_pointer_cast<UpdateLogRecord>(log_record);
@@ -186,7 +183,7 @@ void RecoveryManager::undo() {
                 RmFileHandle* table_file = sm_manager_->fhs_[std::string(delete_log_record->table_name_, delete_log_record->table_name_size_)].get();
                 table_file->insert_record(delete_log_record->rid_, delete_log_record->delete_value_.data);
             }
-            txn_id = log_record->prev_lsn_;
+            curr_lsn = log_record->prev_lsn_;
         }
         
     }

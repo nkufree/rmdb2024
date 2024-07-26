@@ -59,6 +59,7 @@ void SmManager::create_db(const std::string& db_name) {
 
     // 创建日志文件
     disk_manager_->create_file(LOG_FILE_NAME);
+    disk_manager_->create_file(RESTART_FILE_NAME);
 
     // 回到根目录
     if (chdir("..") < 0) {
@@ -355,9 +356,4 @@ void SmManager::show_index(const std::string& tab_name, Context* context) {
         printer.print_separator(context);
     }
     outfile.close();
-}
-
-void SmManager::create_static_checkpoint(Context* context)
-{
-    
 }

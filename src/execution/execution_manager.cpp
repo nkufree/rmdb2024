@@ -126,7 +126,7 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
             }     
             case T_Checkpoint:
             {
-                sm_manager_->create_static_checkpoint(context);
+                txn_mgr_->create_static_checkpoint(context, sm_manager_);
                 break;
             }
             default:

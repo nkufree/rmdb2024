@@ -44,6 +44,8 @@ public:
 
     LockManager* get_lock_manager() { return lock_manager_; }
 
+    void create_static_checkpoint(Context* context, SmManager* sm_manager);
+
     /**
      * @description: 获取事务ID为txn_id的事务对象
      * @return {Transaction*} 事务对象的指针
@@ -71,4 +73,5 @@ private:
     std::mutex latch_;  // 用于txn_map的并发
     SmManager *sm_manager_;
     LockManager *lock_manager_;
+    std::condition_variable cv_;    // 用于唤醒静态检查点线程
 };

@@ -80,5 +80,5 @@ class SmManager {
 
     void show_index(const std::string& tab_name, Context* context);
 
-    void create_static_checkpoint(Context* context);
+    void flush_all_pages(){ buffer_pool_manager_->flush_all_pages(); }
 };

@@ -166,9 +166,6 @@ public:
         log_tid_ = INVALID_TXN_ID;
         prev_lsn_ = INVALID_LSN;
     }
-    StaticCKPTLogRecord(txn_id_t txn_id) : StaticCKPTLogRecord() {
-        log_tid_ = txn_id;
-    }
     // 序列化StaticCKPT日志记录到dest中
     void serialize(char* dest) const override {
         LogRecord::serialize(dest);
@@ -418,6 +415,8 @@ public:
     void flush_log_to_disk();
 
     LogBuffer* get_log_buffer() { return &log_buffer_; }
+
+    lsn_t add_static_CKPT(LogRecord* log_record);
 
 private:    
     std::atomic<lsn_t> global_lsn_{0};  // 全局lsn，递增，用于为每条记录分发lsn
