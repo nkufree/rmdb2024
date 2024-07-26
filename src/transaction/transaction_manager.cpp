@@ -26,10 +26,6 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     // 2. 如果为空指针，创建新事务
     // 3. 把开始事务加入到全局事务表中
     // 4. 返回当前事务指针
-    BeginLogRecord log_record(txn->get_transaction_id());
-    log_record.prev_lsn_ = txn->get_prev_lsn();
-    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
-    txn->set_prev_lsn(curr_lsn);
     Transaction* res;
     if(txn != nullptr) {
         return txn;
@@ -40,6 +36,10 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     res->set_start_ts(next_timestamp_);
     next_txn_id_++;
     next_timestamp_++;
+    BeginLogRecord log_record(res->get_transaction_id());
+    log_record.prev_lsn_ = res->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    res->set_prev_lsn(curr_lsn);
     res->set_state(TransactionState::DEFAULT);
     return res;
 }
@@ -77,6 +77,7 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
         lock_manager_->unlock(txn, *it);
         it = txn->get_lock_set()->erase(it);
     }
+    log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::COMMITTED);
 }
 
@@ -159,10 +160,10 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         switch (type)
         {
         case WType::INSERT_TUPLE:
-            fh_->delete_record(write_record->GetRid(), &context);
+            fh_->delete_record(write_record->GetRid(), nullptr);
             break;
         case WType::UPDATE_TUPLE:
-            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, &context);
+            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, nullptr);
             break;
         default:
             break;
@@ -185,5 +186,6 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         lock_manager_->unlock(txn, *it);
         it = txn->get_lock_set()->erase(it);
     }
+    log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::ABORTED);
 }
