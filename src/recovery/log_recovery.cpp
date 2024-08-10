@@ -194,4 +194,20 @@ void RecoveryManager::undo() {
         }
         
     }
+    // 删除索引，重新建立索引
+    for(auto& table : sm_manager_->fhs_)
+    {
+        auto tab = sm_manager_->db_.get_table(table.first);
+        std::vector<IndexMeta> indexes = tab.indexes;
+        for(auto& index : indexes)
+        {
+            std::vector<std::string> index_cols;
+            for(auto& col : index.cols)
+            {
+                index_cols.push_back(col.name);
+            }
+            sm_manager_->drop_index(table.first, index.cols, nullptr);
+            sm_manager_->create_index(table.first, index_cols, nullptr);
+        }
+    }
 }
