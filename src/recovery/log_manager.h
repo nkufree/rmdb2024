@@ -330,8 +330,8 @@ public:
         before_value_ = before_value;
         update_value_ = update_value;
         rid_ = rid;
-        log_tot_len_ += sizeof(int);
-        log_tot_len_ += update_value_.size;
+        log_tot_len_ += sizeof(int) + before_value_.size;
+        log_tot_len_ += sizeof(int) + update_value_.size;
         log_tot_len_ += sizeof(Rid);
         table_name_size_ = table_name.length();
         table_name_ = new char[table_name_size_];
@@ -362,7 +362,7 @@ public:
         LogRecord::deserialize(src);  
         before_value_.Deserialize(src + OFFSET_LOG_DATA);
         int offset = OFFSET_LOG_DATA + before_value_.size + sizeof(int);
-        update_value_.Deserialize(src + OFFSET_LOG_DATA);
+        update_value_.Deserialize(src + offset);
         offset += update_value_.size + sizeof(int);
         rid_ = *reinterpret_cast<const Rid*>(src + offset);
         offset += sizeof(Rid);

@@ -61,11 +61,11 @@ void RecoveryManager::analyze() {
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
             undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        // } else if(base_record.log_type_ == LogType::UPDATE) {
-        //     std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
-        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-        //     log_records_.emplace(base_record.lsn_, log_record);
-        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        } else if(base_record.log_type_ == LogType::UPDATE) {
+            std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
+            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+            log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
         } else if(base_record.log_type_ == LogType::INSERT) {
             std::shared_ptr<InsertLogRecord> log_record = std::make_shared<InsertLogRecord>();
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
@@ -77,9 +77,9 @@ void RecoveryManager::analyze() {
             log_records_.emplace(base_record.lsn_, log_record);
             undo_txn_[log_record->log_tid_] = base_record.lsn_;
         }
-        // else {
-        //     throw InternalError("Invalid log type");
-        // }
+        else {
+            throw InternalError("Invalid log type");
+        }
         buffer_.offset_ += base_record.log_tot_len_;
     }
     // 将事务执行的操作按顺序分配到各个页面上
