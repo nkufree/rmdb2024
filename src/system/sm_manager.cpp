@@ -260,9 +260,9 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     ix_manager_->create_index(tab_name, cols);
     tab.indexes.push_back({tab_name, col_tot_len,(int)cols.size(), cols});
     ihs_.emplace(ix_manager_->get_index_name(tab_name, col_names), std::move(ix_manager_->open_index(tab_name, col_names)));
+    flush_meta();
     // 将原有的数据插入索引中
     auto fh = fhs_[tab_name].get();
-    flush_meta();
     auto scan = std::make_unique<RmScan>(fh);
     char* key = new char[tab.get_col_total_len()];
     auto ih = ihs_.at(ix_manager_->get_index_name(tab_name, cols)).get();

@@ -201,12 +201,15 @@ void RecoveryManager::undo() {
         std::vector<IndexMeta> indexes = tab.indexes;
         for(auto& index : indexes)
         {
+            sm_manager_->drop_index(table.first, index.cols, nullptr);
+        }
+        for(auto& index : indexes)
+        {
             std::vector<std::string> index_cols;
             for(auto& col : index.cols)
             {
                 index_cols.push_back(col.name);
             }
-            sm_manager_->drop_index(table.first, index.cols, nullptr);
             sm_manager_->create_index(table.first, index_cols, nullptr);
         }
     }
