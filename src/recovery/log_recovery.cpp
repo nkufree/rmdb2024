@@ -40,48 +40,47 @@ void RecoveryManager::analyze() {
             buffer_.offset_ = 0;
         }
         offset += base_record.log_tot_len_;
-        if(base_record.log_type_ == LogType::STATIC_CHECKPOINT) {
-            std::shared_ptr<StaticCKPTLogRecord> log_record = std::make_shared<StaticCKPTLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-        } else if(base_record.log_type_ == LogType::begin) {
-            std::shared_ptr<BeginLogRecord> log_record = std::make_shared<BeginLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-            undo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
-            txn_list_.push_back(log_record->log_tid_);
-        } else if(base_record.log_type_ == LogType::commit) {
-            std::shared_ptr<CommitLogRecord> log_record = std::make_shared<CommitLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-            redo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
-            undo_txn_.erase(log_record->log_tid_);
-        } else if(base_record.log_type_ == LogType::ABORT) {
-            std::shared_ptr<AbortLogRecord> log_record = std::make_shared<AbortLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-            undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        } else if(base_record.log_type_ == LogType::UPDATE) {
-            std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-            undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        } else if(base_record.log_type_ == LogType::INSERT) {
-            std::shared_ptr<InsertLogRecord> log_record = std::make_shared<InsertLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-            undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        } else if(base_record.log_type_ == LogType::DELETE) {
-            std::shared_ptr<DeleteLogRecord> log_record = std::make_shared<DeleteLogRecord>();
-            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-            log_records_.emplace(base_record.lsn_, log_record);
-            undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        }
-        else {
-            throw InternalError("Invalid log type");
-        }
+        // if(base_record.log_type_ == LogType::STATIC_CHECKPOINT) {
+        //     std::shared_ptr<StaticCKPTLogRecord> log_record = std::make_shared<StaticCKPTLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        // } else if(base_record.log_type_ == LogType::begin) {
+        //     std::shared_ptr<BeginLogRecord> log_record = std::make_shared<BeginLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        //     undo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
+        //     txn_list_.push_back(log_record->log_tid_);
+        // } else if(base_record.log_type_ == LogType::commit) {
+        //     std::shared_ptr<CommitLogRecord> log_record = std::make_shared<CommitLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        //     redo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
+        //     undo_txn_.erase(log_record->log_tid_);
+        // } else if(base_record.log_type_ == LogType::ABORT) {
+        //     std::shared_ptr<AbortLogRecord> log_record = std::make_shared<AbortLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        // } else if(base_record.log_type_ == LogType::UPDATE) {
+        //     std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        // } else if(base_record.log_type_ == LogType::INSERT) {
+        //     std::shared_ptr<InsertLogRecord> log_record = std::make_shared<InsertLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        // } else if(base_record.log_type_ == LogType::DELETE) {
+        //     std::shared_ptr<DeleteLogRecord> log_record = std::make_shared<DeleteLogRecord>();
+        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+        //     log_records_.emplace(base_record.lsn_, log_record);
+        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        // }
+        // else {
+        //     throw InternalError("Invalid log type");
+        // }
         buffer_.offset_ += base_record.log_tot_len_;
-    return;
     }
     // 将事务执行的操作按顺序分配到各个页面上
     std::map<lsn_t, std::shared_ptr<LogRecord>>::iterator it = log_records_.begin();
