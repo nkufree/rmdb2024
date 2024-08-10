@@ -81,8 +81,8 @@ void RecoveryManager::analyze() {
             throw InternalError("Invalid log type");
         }
         buffer_.offset_ += base_record.log_tot_len_;
-    }
     return;
+    }
     // 将事务执行的操作按顺序分配到各个页面上
     std::map<lsn_t, std::shared_ptr<LogRecord>>::iterator it = log_records_.begin();
     for(;it != log_records_.end(); it++)
