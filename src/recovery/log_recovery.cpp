@@ -56,17 +56,17 @@ void RecoveryManager::analyze() {
             log_records_.emplace(base_record.lsn_, log_record);
             redo_txn_.emplace(log_record->log_tid_, base_record.lsn_);
             undo_txn_.erase(log_record->log_tid_);
-        }// else if(base_record.log_type_ == LogType::ABORT) {
-        //     std::shared_ptr<AbortLogRecord> log_record = std::make_shared<AbortLogRecord>();
-        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-        //     log_records_.emplace(base_record.lsn_, log_record);
-        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        // } else if(base_record.log_type_ == LogType::UPDATE) {
-        //     std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
-        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-        //     log_records_.emplace(base_record.lsn_, log_record);
-        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        // } else if(base_record.log_type_ == LogType::INSERT) {
+        } else if(base_record.log_type_ == LogType::ABORT) {
+            std::shared_ptr<AbortLogRecord> log_record = std::make_shared<AbortLogRecord>();
+            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+            log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        } else if(base_record.log_type_ == LogType::UPDATE) {
+            std::shared_ptr<UpdateLogRecord> log_record = std::make_shared<UpdateLogRecord>();
+            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+            log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        } //else if(base_record.log_type_ == LogType::INSERT) {
         //     std::shared_ptr<InsertLogRecord> log_record = std::make_shared<InsertLogRecord>();
         //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
         //     log_records_.emplace(base_record.lsn_, log_record);
