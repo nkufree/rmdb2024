@@ -71,11 +71,11 @@ void RecoveryManager::analyze() {
             log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
             log_records_.emplace(base_record.lsn_, log_record);
             undo_txn_[log_record->log_tid_] = base_record.lsn_;
-        // } else if(base_record.log_type_ == LogType::DELETE) {
-        //     std::shared_ptr<DeleteLogRecord> log_record = std::make_shared<DeleteLogRecord>();
-        //     log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
-        //     log_records_.emplace(base_record.lsn_, log_record);
-        //     undo_txn_[log_record->log_tid_] = base_record.lsn_;
+        } else if(base_record.log_type_ == LogType::DELETE) {
+            std::shared_ptr<DeleteLogRecord> log_record = std::make_shared<DeleteLogRecord>();
+            log_record->deserialize(buffer_.buffer_ + buffer_.offset_);
+            log_records_.emplace(base_record.lsn_, log_record);
+            undo_txn_[log_record->log_tid_] = base_record.lsn_;
         }
         // else {
         //     throw InternalError("Invalid log type");
