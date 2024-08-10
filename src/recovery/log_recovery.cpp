@@ -82,6 +82,7 @@ void RecoveryManager::analyze() {
         }
         buffer_.offset_ += base_record.log_tot_len_;
     }
+    return;
     // 将事务执行的操作按顺序分配到各个页面上
     std::map<lsn_t, std::shared_ptr<LogRecord>>::iterator it = log_records_.begin();
     for(;it != log_records_.end(); it++)
@@ -108,8 +109,6 @@ void RecoveryManager::analyze() {
             std::shared_ptr<DeleteLogRecord> delete_log_record = std::dynamic_pointer_cast<DeleteLogRecord>(log_record);
             page_id = delete_log_record->rid_.page_no;
             table_name = std::string(delete_log_record->table_name_, delete_log_record->table_name_size_);
-        } else {
-            throw InternalError("Invalid log type");
         }
         auto fh = sm_manager_->fhs_[table_name].get();
         if(fh == nullptr)
