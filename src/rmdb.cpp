@@ -307,8 +307,8 @@ int main(int argc, char **argv) {
             std::cerr << e.what() << '\n';
         }
         
-        // recovery->redo();
-        // recovery->undo();
+        recovery->redo();
+        recovery->undo();
         
         // 开启服务端，开始接受客户端连接
         start_server();
