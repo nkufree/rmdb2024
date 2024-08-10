@@ -77,6 +77,9 @@ void RecoveryManager::analyze() {
             log_records_.emplace(base_record.lsn_, log_record);
             undo_txn_[log_record->log_tid_] = base_record.lsn_;
         }
+        else {
+            throw InternalError("Invalid log type");
+        }
         buffer_.offset_ += base_record.log_tot_len_;
     }
     // 将事务执行的操作按顺序分配到各个页面上
@@ -105,8 +108,14 @@ void RecoveryManager::analyze() {
             std::shared_ptr<DeleteLogRecord> delete_log_record = std::dynamic_pointer_cast<DeleteLogRecord>(log_record);
             page_id = delete_log_record->rid_.page_no;
             table_name = std::string(delete_log_record->table_name_, delete_log_record->table_name_size_);
+        } else {
+            throw InternalError("Invalid log type");
         }
         auto fh = sm_manager_->fhs_[table_name].get();
+        if(fh == nullptr)
+        {
+            throw TableNotFoundError(table_name);
+        }
         PageId pid = {fh->GetFd(), page_id};
         if(redo_logs_map_.find(pid) == redo_logs_map_.end())
         {
