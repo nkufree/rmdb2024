@@ -21,7 +21,8 @@ std::unique_ptr<RmRecord> RmFileHandle::get_record(const Rid& rid, Context* cont
     // 1. 获取指定记录所在的page handle
     // 2. 初始化一个指向RmRecord的指针（赋值其内部的data和size）
     // context->lock_mgr_->lock_shared_on_record(context->txn_, rid, fd_);
-    context->lock_mgr_->lock_shared_on_table(context->txn_, fd_);
+    if(context)
+        context->lock_mgr_->lock_shared_on_table(context->txn_, fd_);
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     char* slot = page_handle.get_slot(rid.slot_no);
     std::unique_ptr<RmRecord> record = std::make_unique<RmRecord>(file_hdr_.record_size, slot);
@@ -54,7 +55,8 @@ Rid RmFileHandle::insert_record(char* buf, Context* context) {
     // 3. 将buf复制到空闲slot位置
     // 4. 更新page_handle.page_hdr中的数据结构
     // 注意考虑插入一条记录后页面已满的情况，需要更新file_hdr_.first_free_page_no
-    context->lock_mgr_->lock_exclusive_on_table(context->txn_, fd_);
+    if(context)
+        context->lock_mgr_->lock_exclusive_on_table(context->txn_, fd_);
     RmPageHandle page_handle = create_page_handle();
     int slot_no = Bitmap::first_bit(0, page_handle.bitmap, file_hdr_.num_records_per_page);
     if(slot_no == file_hdr_.num_records_per_page) {

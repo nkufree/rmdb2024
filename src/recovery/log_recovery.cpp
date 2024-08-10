@@ -197,7 +197,7 @@ void RecoveryManager::undo() {
     // 删除索引，重新建立索引
     for(auto& table : sm_manager_->fhs_)
     {
-        auto tab = sm_manager_->db_.get_table(table.first);
+        auto& tab = sm_manager_->db_.get_table(table.first);
         std::vector<IndexMeta> indexes = tab.indexes;
         for(auto& index : indexes)
         {
