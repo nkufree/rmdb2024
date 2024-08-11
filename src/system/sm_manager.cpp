@@ -301,21 +301,21 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
         //     ih->insert_entry(key, rid, nullptr, &success);
         // }
     }
-    for(auto& table : fhs_)
-    {
-        auto& tab = db_.get_table(table.first);
-        std::vector<IndexMeta> indexes = tab.indexes;
-        for(auto& index : indexes)
-        {
-            std::vector<std::string> index_cols;
-            for(auto& col : index.cols)
-            {
-                index_cols.push_back(col.name);
-            }
-            drop_index(table.first, index.cols, nullptr);
-            create_index(table.first, index_cols, nullptr);
-        }
-    }
+    // for(auto& table : fhs_)
+    // {
+    //     auto& tab = db_.get_table(table.first);
+    //     std::vector<IndexMeta> indexes = tab.indexes;
+    //     for(auto& index : indexes)
+    //     {
+    //         std::vector<std::string> index_cols;
+    //         for(auto& col : index.cols)
+    //         {
+    //             index_cols.push_back(col.name);
+    //         }
+    //         drop_index(table.first, index.cols, nullptr);
+    //         create_index(table.first, index_cols, nullptr);
+    //     }
+    // }
     csv_data.close();
 }
 
