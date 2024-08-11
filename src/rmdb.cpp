@@ -297,15 +297,15 @@ int main(int argc, char **argv) {
         sm_manager->open_db(db_name);
 
         // recovery database
-        try
-        {
+        // try
+        // {
             /* code */
         recovery->analyze();
-        }
-        catch(const std::exception& e)
-        {
-            std::cerr << e.what() << '\n';
-        }
+        // }
+        // catch(const std::exception& e)
+        // {
+        //     std::cerr << e.what() << '\n';
+        // }
         
         recovery->redo();
         recovery->undo();
