@@ -72,6 +72,8 @@ class SmManager {
 
     void drop_table(const std::string& tab_name, Context* context);
 
+    void load_table(const std::string& file_name, const std::string& tab_name);
+
     void create_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context);
 
     void drop_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context);

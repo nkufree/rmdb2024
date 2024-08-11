@@ -81,6 +81,10 @@ struct Value {
             float_val = int_val;
         } else if (type == TYPE_FLOAT && new_type == TYPE_INT) {
             int_val = float_val;
+        } else if(type == TYPE_STRING && new_type == TYPE_INT) {
+            int_val = std::stoi(str_val);
+        } else if(type == TYPE_STRING && new_type == TYPE_FLOAT) {
+            float_val = std::stof(str_val);
         } else {
             throw IncompatibleTypeError(coltype2str(type), coltype2str(new_type));
         }
