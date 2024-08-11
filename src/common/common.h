@@ -70,7 +70,21 @@ struct Value {
             if (len < (int)str_val.size()) {
                 throw StringOverflowError();
             }
-            memset(raw->data, 0, len);
+            memcpy(raw->data, str_val.c_str(), str_val.size());
+            memset(raw->data + str_val.size(), 0, len - str_val.size());
+        }
+    }
+
+    void update_raw() {
+        if (type == TYPE_INT) {
+            *(int *)(raw->data) = int_val;
+        } else if (type == TYPE_FLOAT) {
+            *(float *)(raw->data) = float_val;
+        } else if (type == TYPE_STRING) {
+            if (str_len < (int)str_val.size()) {
+                throw StringOverflowError();
+            }
+            memset(raw->data, 0, str_len);
             memcpy(raw->data, str_val.c_str(), str_val.size());
         }
     }

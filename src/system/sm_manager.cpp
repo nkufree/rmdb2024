@@ -252,6 +252,17 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
     std::string line;
     std::string word;
     std::vector<Value> values(tab.cols.size());
+    for(int i = 0; i < tab.cols.size(); ++i) {
+        if(tab.cols[i].type == TYPE_INT) {
+            values[i].set_int(0);
+        } else if(tab.cols[i].type == TYPE_FLOAT) {
+            values[i].set_float(0.0);
+        } else if(tab.cols[i].type == TYPE_STRING) {
+            values[i].set_str("");
+            values[i].str_len = tab.cols[i].len;
+        }
+        values[i].init_raw(tab.cols[i].len);
+    }
     getline(csv_data, line);
     std::istringstream sin;
     RmRecord rec(fh->get_file_hdr().record_size);
@@ -264,11 +275,10 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
         int curr = 0;
         while (getline(sin, word, ','))
         {
-            Value curr_value;
+            Value& curr_value = values[curr];
             curr_value.set_str(word);
             curr_value.value_cast(tab.cols[curr].type);
-            curr_value.init_raw(tab.cols[curr].len);
-            values[curr] = curr_value;
+            curr_value.update_raw();
             curr++;
         }
         // 插入数据
