@@ -181,7 +181,7 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     std::fstream outfile;
     bool enable_output_file = planner_->get_enable_output_file();
     if(enable_output_file) {
-        outfile.open("output.txt", std::ios::out | std::ios::trunc);
+        outfile.open("output.txt", std::ios::out | std::ios::app);
     }
     
     // Print records
