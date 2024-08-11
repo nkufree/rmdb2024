@@ -175,7 +175,7 @@ int IxNodeHandle::insert(const char *key, const Rid &value) {
     // 1
     int pos = lower_bound(key);
     // 2,3
-    if(pos >= page_hdr->num_key || ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) != 0)
+    if(pos >= page_hdr->num_key || memcmp(get_key(pos), key, file_hdr->col_tot_len_) != 0)
     {
         insert_pairs(pos, key, &value, 1);
     }
@@ -403,7 +403,8 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     // 2. 在该叶子节点中插入键值对
     // 3. 如果结点已满，分裂结点，并把新结点的相关信息插入父节点
     // 提示：记得unpin page；若当前叶子节点是最右叶子节点，则需要更新file_hdr_.last_leaf；记得处理并发的上锁
-    std::scoped_lock<std::mutex> lock(root_latch_);
+    if(transaction)
+        std::scoped_lock<std::mutex> lock(root_latch_);
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::INSERT, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
     int prev_num_key = node->get_size();
@@ -414,7 +415,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
         *success = false;
         return node->get_page_no();
     }
-    if(node->lower_bound(key) == 0)
+    if(memcmp(node->get_key(0), key, file_hdr_->col_tot_len_) == 0)
         maintain_parent(node.get());
     if(num_key == file_hdr_->btree_order_) {
         IxNodeHandle* new_node = split(node.get());
@@ -443,7 +444,7 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::DELETE, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
     node->remove(key);
-    if(node->lower_bound(key) == 0)
+    if(memcmp(node->get_key(0), key, file_hdr_->col_tot_len_) == 0)
         maintain_parent(node.get());
     bool root_is_latched = false;
     bool res = coalesce_or_redistribute(node.get(), transaction, &root_is_latched);
