@@ -115,6 +115,8 @@ private:
         } else if (auto x = std::dynamic_pointer_cast<ShowIndex>(node)) {
             std::cout << "SHOW_INDEX\n";
             print_val(x->tab_name, offset);
+        } else if (auto x = std::dynamic_pointer_cast<CreateStaticCheckpoint>(node)) {
+            std::cout << "CREATE_STATIC_CHECKPOINT\n";
         } else if (auto x = std::dynamic_pointer_cast<ColDef>(node)) {
             std::cout << "COL_DEF\n";
             print_val(x->col_name, offset);

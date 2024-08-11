@@ -59,6 +59,7 @@ void SmManager::create_db(const std::string& db_name) {
 
     // 创建日志文件
     disk_manager_->create_file(LOG_FILE_NAME);
+    disk_manager_->create_file(RESTART_FILE_NAME);
 
     // 回到根目录
     if (chdir("..") < 0) {
@@ -259,9 +260,10 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     ix_manager_->create_index(tab_name, cols);
     tab.indexes.push_back({tab_name, col_tot_len,(int)cols.size(), cols});
     ihs_.emplace(ix_manager_->get_index_name(tab_name, col_names), std::move(ix_manager_->open_index(tab_name, col_names)));
+    flush_meta();
     // 将原有的数据插入索引中
-    auto &fh = fhs_[tab_name];
-    auto scan = std::make_unique<RmScan>(fh.get());
+    auto fh = fhs_[tab_name].get();
+    auto scan = std::make_unique<RmScan>(fh);
     char* key = new char[tab.get_col_total_len()];
     auto ih = ihs_.at(ix_manager_->get_index_name(tab_name, cols)).get();
     while (!scan->is_end()) {
@@ -272,7 +274,8 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
             offset += cols[i].len;
         }
         bool success;
-        ih->insert_entry(key, scan->rid(), context->txn_, &success);
+        Transaction* txn = context == nullptr ? nullptr : context->txn_;
+        ih->insert_entry(key, scan->rid(), txn, &success);
         if(!success) {
             fh->delete_record(scan->rid(), context);
         }
@@ -309,6 +312,7 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<std::s
     assert(res);
     ix_manager_->destroy_index(tab_name, col_names);
     ihs_.erase(index_it);
+    flush_meta();
 }
 
 /**
@@ -332,6 +336,7 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<ColMet
     assert(res);
     ix_manager_->destroy_index(tab_name, cols);
     ihs_.erase(index_it);
+    flush_meta();
 }
 
 void SmManager::show_index(const std::string& tab_name, Context* context) {

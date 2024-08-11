@@ -73,6 +73,8 @@ class RmFileHandle {
 
     std::unique_ptr<RmRecord> get_record(const Rid &rid, Context *context) const;
 
+    Rid get_free_record(Context* context);
+
     Rid insert_record(char *buf, Context *context);
 
     void insert_record(const Rid &rid, char *buf);

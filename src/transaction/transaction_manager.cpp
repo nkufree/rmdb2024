@@ -30,12 +30,16 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     if(txn != nullptr) {
         return txn;
     }
-    std::scoped_lock<std::mutex> lock(latch_);
+    std::unique_lock<std::shared_mutex> lock(latch_);
     res = new Transaction(next_txn_id_);
     txn_map[next_txn_id_] = res;
     res->set_start_ts(next_timestamp_);
     next_txn_id_++;
     next_timestamp_++;
+    BeginLogRecord log_record(res->get_transaction_id());
+    log_record.prev_lsn_ = res->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    res->set_prev_lsn(curr_lsn);
     res->set_state(TransactionState::DEFAULT);
     return res;
 }
@@ -52,7 +56,10 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 3. 释放事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    std::scoped_lock lock(latch_);
+    CommitLogRecord log_record(txn->get_transaction_id());
+    log_record.prev_lsn_ = txn->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    txn->set_prev_lsn(curr_lsn);
     txn->get_write_set()->clear();
     for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
     {
@@ -69,7 +76,9 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
         lock_manager_->unlock(txn, *it);
         it = txn->get_lock_set()->erase(it);
     }
+    log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::COMMITTED);
+    cv_.notify_all();
 }
 
 /**
@@ -84,8 +93,10 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 3. 清空事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    std::scoped_lock lock(latch_);
-
+    AbortLogRecord log_record(txn->get_transaction_id());
+    log_record.prev_lsn_ = txn->get_prev_lsn();
+    lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
+    txn->set_prev_lsn(curr_lsn);
     Context context(lock_manager_, log_manager, txn);
     auto write_set = txn->get_write_set();
     while (!write_set->empty())
@@ -148,10 +159,10 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         switch (type)
         {
         case WType::INSERT_TUPLE:
-            fh_->delete_record(write_record->GetRid(), &context);
+            fh_->delete_record(write_record->GetRid(), nullptr);
             break;
         case WType::UPDATE_TUPLE:
-            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, &context);
+            fh_->update_record(write_record->GetRid(), write_record->GetRecord().data, nullptr);
             break;
         default:
             break;
@@ -174,5 +185,28 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         lock_manager_->unlock(txn, *it);
         it = txn->get_lock_set()->erase(it);
     }
+    log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::ABORTED);
+    cv_.notify_all();
+}
+
+void TransactionManager::create_static_checkpoint(Context* context, SmManager* sm_manager)
+{
+    // 停止接受新事务
+    std::shared_lock<std::shared_mutex> lock(latch_);
+    this->commit(context->txn_, context->log_mgr_);
+    // 等待现有事务完成
+    std::mutex mtx;
+    std::unique_lock<std::mutex> lck(mtx);
+    cv_.wait(lck, [&]() {
+        return std::all_of(txn_map.begin(), txn_map.end(), [&](const auto& pair) {
+            return pair.second->get_state() == TransactionState::COMMITTED || pair.second->get_state() == TransactionState::ABORTED;
+        });
+    });
+    // 刷新磁盘
+    sm_manager->flush_all_pages();
+    // 添加日志
+    StaticCKPTLogRecord log_record;
+    context->log_mgr_->add_static_CKPT(&log_record);
+
 }

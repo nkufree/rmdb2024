@@ -127,6 +127,9 @@ struct DropIndex : public TreeNode {
             tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
 };
 
+struct CreateStaticCheckpoint : public TreeNode {
+};
+
 struct Expr : public TreeNode {
 };
 
