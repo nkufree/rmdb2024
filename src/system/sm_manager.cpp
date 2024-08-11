@@ -289,16 +289,31 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
         }
         Rid rid = fh->insert_record(rec.data, nullptr);
         // 插入索引
-        for(size_t i = 0; i < tab.indexes.size(); ++i) {
-            auto& index = tab.indexes[i];
-            auto ih = ihs_.at(get_ix_manager()->get_index_name(tab_name, index.cols)).get();
-            int offset = 0;
-            for(size_t j = 0; j < (size_t)index.col_num; ++j) {
-                memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
-                offset += index.cols[j].len;
+        // for(size_t i = 0; i < tab.indexes.size(); ++i) {
+        //     auto& index = tab.indexes[i];
+        //     auto ih = ihs_.at(get_ix_manager()->get_index_name(tab_name, index.cols)).get();
+        //     int offset = 0;
+        //     for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+        //         memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
+        //         offset += index.cols[j].len;
+        //     }
+        //     bool success;
+        //     ih->insert_entry(key, rid, nullptr, &success);
+        // }
+    }
+    for(auto& table : fhs_)
+    {
+        auto& tab = db_.get_table(table.first);
+        std::vector<IndexMeta> indexes = tab.indexes;
+        for(auto& index : indexes)
+        {
+            std::vector<std::string> index_cols;
+            for(auto& col : index.cols)
+            {
+                index_cols.push_back(col.name);
             }
-            bool success;
-            ih->insert_entry(key, rid, nullptr, &success);
+            drop_index(table.first, index.cols, nullptr);
+            create_index(table.first, index_cols, nullptr);
         }
     }
     csv_data.close();
