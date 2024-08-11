@@ -267,6 +267,11 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
     std::istringstream sin;
     RmRecord rec(fh->get_file_hdr().record_size);
     char* key = new char[tab.get_col_total_len()];
+    auto& indexes = tab.indexes;
+    std::vector<IxIndexHandle*> ihs;
+    for(auto& index: indexes) {
+        ihs.push_back(ihs_.at(ix_manager_->get_index_name(tab_name, index.cols)).get());
+    }
     // 读取每一行数据
     while (getline(csv_data, line))
     {
@@ -289,17 +294,17 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
         }
         Rid rid = fh->insert_record(rec.data, nullptr);
         // 插入索引
-        // for(size_t i = 0; i < tab.indexes.size(); ++i) {
-        //     auto& index = tab.indexes[i];
-        //     auto ih = ihs_.at(get_ix_manager()->get_index_name(tab_name, index.cols)).get();
-        //     int offset = 0;
-        //     for(size_t j = 0; j < (size_t)index.col_num; ++j) {
-        //         memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
-        //         offset += index.cols[j].len;
-        //     }
-        //     bool success;
-        //     ih->insert_entry(key, rid, nullptr, &success);
-        // }
+        for(size_t i = 0; i < indexes.size(); ++i) {
+            auto& index = indexes[i];
+            auto& ih = ihs[i];
+            int offset = 0;
+            for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+                memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
+                offset += index.cols[j].len;
+            }
+            bool success;
+            ih->insert_entry(key, rid, nullptr, &success);
+        }
     }
     // for(auto& table : fhs_)
     // {
