@@ -251,18 +251,18 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
     }
     std::string line;
     std::string word;
-    std::vector<Value> values(tab.cols.size());
-    for(int i = 0; i < tab.cols.size(); ++i) {
-        if(tab.cols[i].type == TYPE_INT) {
-            values[i].set_int(0);
-        } else if(tab.cols[i].type == TYPE_FLOAT) {
-            values[i].set_float(0.0);
-        } else if(tab.cols[i].type == TYPE_STRING) {
-            values[i].set_str("");
-            values[i].str_len = tab.cols[i].len;
-        }
-        values[i].init_raw(tab.cols[i].len);
-    }
+    // std::vector<Value> values(tab.cols.size());
+    // for(int i = 0; i < tab.cols.size(); ++i) {
+    //     if(tab.cols[i].type == TYPE_INT) {
+    //         values[i].set_int(0);
+    //     } else if(tab.cols[i].type == TYPE_FLOAT) {
+    //         values[i].set_float(0.0);
+    //     } else if(tab.cols[i].type == TYPE_STRING) {
+    //         values[i].set_str("");
+    //         values[i].str_len = tab.cols[i].len;
+    //     }
+    //     values[i].init_raw(tab.cols[i].len);
+    // }
     getline(csv_data, line);
     std::istringstream sin;
     RmRecord rec(fh->get_file_hdr().record_size);
@@ -280,18 +280,21 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
         int curr = 0;
         while (getline(sin, word, ','))
         {
-            Value& curr_value = values[curr];
+            // Value& curr_value = values[curr];
+            Value curr_value;
             curr_value.set_str(word);
             curr_value.value_cast(tab.cols[curr].type);
-            curr_value.update_raw();
+            auto &col = tab.cols[curr];
+            curr_value.init_raw(col.len);
+            memcpy(rec.data + col.offset, curr_value.raw->data, col.len);
             curr++;
         }
         // 插入数据
-        for (size_t i = 0; i < values.size(); i++) {
-            auto &col = tab.cols[i];
-            auto &val = values[i];
-            memcpy(rec.data + col.offset, val.raw->data, col.len);
-        }
+        // for (size_t i = 0; i < values.size(); i++) {
+        //     auto &col = tab.cols[i];
+        //     auto &val = values[i];
+        //     memcpy(rec.data + col.offset, val.raw->data, col.len);
+        // }
         Rid rid = fh->insert_record(rec.data, nullptr);
         // 插入索引
         for(size_t i = 0; i < indexes.size(); ++i) {
