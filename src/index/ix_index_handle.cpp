@@ -70,7 +70,7 @@ int IxNodeHandle::upper_bound(const char *target) const {
         }
     }
     // assert(first > 0 || (first == 0 && page_hdr->num_key == 0) || page_hdr->parent == INVALID_PAGE_ID);
-    if(ix_compare(get_key(first), target, file_hdr->col_types_, file_hdr->col_lens_) > 0)
+    if(memcmp(get_key(first), target, file_hdr->col_tot_len_) != 0)
         return first;
     else
         return page_hdr->num_key;
@@ -91,7 +91,7 @@ bool IxNodeHandle::leaf_lookup(const char *key, Rid **value) {
     // 3. 如果存在，获取key对应的Rid，并赋值给传出参数value
     // 提示：可以调用lower_bound()和get_rid()函数。
     int key_idx = lower_bound(key);
-    if(ix_compare(get_key(key_idx), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
+    if(memcmp(get_key(key_idx), key, file_hdr->col_tot_len_) == 0)
     {
         *value = get_rid(key_idx);
         return true;
@@ -117,7 +117,7 @@ page_id_t IxNodeHandle::internal_lookup(const char *key) {
         return value_at(key_idx);
     else
     {
-        if(key_idx < page_hdr->num_key && ix_compare(get_key(key_idx), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
+        if(key_idx < page_hdr->num_key && memcmp(get_key(key_idx), key, file_hdr->col_tot_len_) == 0)
             return value_at(key_idx);
         else
             return value_at(key_idx - 1);
