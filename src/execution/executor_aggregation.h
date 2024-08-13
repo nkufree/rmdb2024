@@ -79,6 +79,10 @@ class AggregationExecutor : public AbstractExecutor {
         having_conds_ = having_conds;
         for(auto &cond : having_conds_) {
             ConditionCheck::execute_sub_query(cond);
+            if(cond.lhs_col.aggr == ast::NO_AGGR || 
+            !(cond.lhs_col.aggr == ast::AGGR_TYPE_COUNT && cond.lhs_col.col_name == "*")) {
+                cond.lhs_match_col = get_col(sel_cols_origin, cond.lhs_col, true);   
+            }
         }
     }
 
@@ -114,9 +118,10 @@ class AggregationExecutor : public AbstractExecutor {
             if (is_end()) return;
             auto &grouped_records = grouped_records_[curr_idx];
             curr_records.clear();
-            for (auto &record : grouped_records) {
-                curr_records.push_back(std::move(record));
-            }
+            // for (auto &record : grouped_records) {
+            //     curr_records.push_back(std::move(record));
+            // }
+            curr_records.swap(grouped_records);
         } while (!checkConditions());
     }
 
@@ -128,14 +133,14 @@ class AggregationExecutor : public AbstractExecutor {
             char *base = handle->data;
             if (!std::all_of(having_conds_.begin(), having_conds_.end(), [base, this](const Condition& cond) {
                 if(cond.lhs_col.aggr == ast::NO_AGGR) {
-                    auto value = get_col(sel_cols_origin, cond.lhs_col, true)->to_value(base);
+                    auto value = cond.lhs_match_col->to_value(base);
                     return cond.eval_with_rvalue(value);
                 } else {
                     ColMeta col_meta;
                     if (cond.lhs_col.aggr == ast::AGGR_TYPE_COUNT && cond.lhs_col.col_name == "*") {
                         col_meta = star_col(cond.lhs_col);
                     } else {
-                        col_meta = *get_col(sel_cols_origin, cond.lhs_col, true);
+                        col_meta = *cond.lhs_match_col;
                     }
                     auto value = aggregate_value(col_meta);
                     Value rhs_val = cond.rhs_val;
@@ -181,7 +186,7 @@ class AggregationExecutor : public AbstractExecutor {
         return col;
     }
 
-    Value aggregate_value(ColMeta sel_col) {
+    Value aggregate_value(ColMeta sel_col) const {
         Value val;
         if (curr_records.empty() && sel_col.aggr != ast::AGGR_TYPE_COUNT && sel_col.aggr != ast::AGGR_TYPE_SUM) {
             val.type = sel_col.type;
