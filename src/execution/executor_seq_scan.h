@@ -45,6 +45,13 @@ class SeqScanExecutor : public AbstractExecutor {
         fed_conds_ = conds_;
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
+            cond.lhs_match_col = get_col(cols_, cond.lhs_col);
+            if(cond.rhs_type == CondRhsType::RHS_COL) {
+                cond.rhs_match_col = get_col(cols_, cond.rhs_col);
+            }
+            else if(cond.rhs_type == CondRhsType::RHS_VALUE) {
+                cond.rhs_val.value_cast(cond.lhs_match_col->type);
+            }
         }
     }
 
@@ -55,7 +62,7 @@ class SeqScanExecutor : public AbstractExecutor {
         while (!scan_->is_end())
         {
             rec = fh_->get_record(scan_->rid(), context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            if(ConditionCheck::check_conditions(fed_conds_, rec))
                 break;
             scan_->next();
         }
@@ -71,7 +78,7 @@ class SeqScanExecutor : public AbstractExecutor {
         while (!scan_->is_end())
         {
             rec = fh_->get_record(scan_->rid(), context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            if(ConditionCheck::check_conditions(fed_conds_, rec))
             {
                 break;
             }

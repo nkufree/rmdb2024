@@ -48,8 +48,8 @@ class DeleteExecutor : public AbstractExecutor {
             if (rec == nullptr) {
                 throw RecordNotFoundError(rid.page_no, rid.slot_no);
             }
-            if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
-                continue;
+            // if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
+            //     continue;
             DeleteLogRecord log_record(context_->txn_->get_transaction_id(), *rec, rid, tab_name_);
             log_record.prev_lsn_ = context_->txn_->get_prev_lsn();
             lsn_t curr_lsn = context_->log_mgr_->add_log_to_buffer(&log_record);

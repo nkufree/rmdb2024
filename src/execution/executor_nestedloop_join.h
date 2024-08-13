@@ -41,7 +41,15 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
         cols_.insert(cols_.end(), right_cols.begin(), right_cols.end());
         isend = false;
         fed_conds_ = std::move(conds);
-
+        for(auto &cond : fed_conds_) {
+            cond.lhs_match_col = get_col(cols_, cond.lhs_col);
+            if(cond.rhs_type == CondRhsType::RHS_COL) {
+                cond.rhs_match_col = get_col(cols_, cond.rhs_col);
+            }
+            else if(cond.rhs_type == CondRhsType::RHS_VALUE) {
+                cond.rhs_val.value_cast(cond.lhs_match_col->type);
+            }
+        }
     }
 
     void beginTuple() override {
@@ -55,7 +63,7 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
                 std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
                 memcpy(new_rec->data, rec_left->data, left_->tupleLen());
                 memcpy(new_rec->data + left_->tupleLen(), rec_right->data, right_->tupleLen());
-                if(ConditionCheck::check_conditions(fed_conds_, cols_, new_rec)) {
+                if(ConditionCheck::check_conditions(fed_conds_, new_rec)) {
                     return;
                 }
                 right_->nextTuple();
@@ -74,7 +82,7 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
                 std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
                 memcpy(new_rec->data, rec_left->data, left_->tupleLen());
                 memcpy(new_rec->data + left_->tupleLen(), rec_right->data, right_->tupleLen());
-                if(ConditionCheck::check_conditions(fed_conds_, cols_, new_rec)) {
+                if(ConditionCheck::check_conditions(fed_conds_, new_rec)) {
                     return;
                 }
                 right_->nextTuple();

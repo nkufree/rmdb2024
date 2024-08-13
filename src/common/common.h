@@ -219,6 +219,8 @@ struct Condition {
     std::shared_ptr<PortalStmt> rhs_portal;
     std::set<Value> rhs_set;
     CondRhsType rhs_type;
+    std::vector<ColMeta>::const_iterator lhs_match_col;
+    std::vector<ColMeta>::const_iterator rhs_match_col;
 
     bool check_condition(const Value& lhs, const Value& rhs) const {
 

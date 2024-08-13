@@ -130,8 +130,16 @@ class IndexScanExecutor : public AbstractExecutor {
                 fed_conds_.push_back(conds_[i]);
             }
         }
+        // 对cond进行预构建，进行子查询执行、类型转换，列预查询等操作
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
+            cond.lhs_match_col = get_col(cols_, cond.lhs_col);
+            if(cond.rhs_type == CondRhsType::RHS_COL) {
+                cond.rhs_match_col = get_col(cols_, cond.rhs_col);
+            }
+            else if(cond.rhs_type == CondRhsType::RHS_VALUE) {
+                cond.rhs_val.value_cast(cond.lhs_match_col->type);
+            }
         }
     }
 
@@ -160,7 +168,7 @@ class IndexScanExecutor : public AbstractExecutor {
         {
             rid_ = scan_->rid();
             rec = fh_->get_record(rid_, context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            if(ConditionCheck::check_conditions(fed_conds_, rec))
             // if(ConditionCheck::check_conditions(conds_, cols_, rec))
                 break;
             scan_->next();
@@ -176,7 +184,7 @@ class IndexScanExecutor : public AbstractExecutor {
                 break;
             rid_ = scan_->rid();
             rec = fh_->get_record(rid_, context_);
-            if(ConditionCheck::check_conditions(fed_conds_, cols_, rec))
+            if(ConditionCheck::check_conditions(fed_conds_, rec))
                 break;
         }
         

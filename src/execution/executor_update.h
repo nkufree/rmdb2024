@@ -102,8 +102,8 @@ class UpdateExecutor : public AbstractExecutor {
                 delete[] key;
                 throw RecordNotFoundError(rid.page_no, rid.slot_no);
             }
-            if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
-                continue;
+            // if(!ConditionCheck::check_conditions(conds_, rec))
+            //     continue;
             // 更新记录
             UpdateLogRecord log_record(context_->txn_->get_transaction_id(), *rec, *rec_new, rid, tab_name_);
             log_record.prev_lsn_ = context_->txn_->get_prev_lsn();

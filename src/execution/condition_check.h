@@ -6,9 +6,9 @@ class ConditionCheck{
 public:
     static void execute_sub_query(Condition& cond);
 
-    static bool check_conditions(std::vector<Condition>& conds, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec);
+    static bool check_conditions(std::vector<Condition>& conds, const std::unique_ptr<RmRecord>& rec);
 
-    static bool check_single_condition(Condition& cond, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec);
+    static bool check_single_condition(Condition& cond, const std::unique_ptr<RmRecord>& rec);
     
 private:
 };
