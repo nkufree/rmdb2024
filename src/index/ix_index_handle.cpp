@@ -70,7 +70,8 @@ int IxNodeHandle::upper_bound(const char *target) const {
         }
     }
     // assert(first > 0 || (first == 0 && page_hdr->num_key == 0) || page_hdr->parent == INVALID_PAGE_ID);
-    if(memcmp(get_key(first), target, file_hdr->col_tot_len_) != 0)
+        if(ix_compare(get_key(first), target, file_hdr->col_types_, file_hdr->col_lens_) > 0)
+        // if(memcmp(get_key(first), target, file_hdr->col_tot_len_) != 0)
         return first;
     else
         return page_hdr->num_key;
