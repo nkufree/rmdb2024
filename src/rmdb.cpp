@@ -165,6 +165,8 @@ void *client_handler(void *sock_fd) {
                     outfile.open("output.txt",std::ios::out | std::ios::app);
                     outfile << "failure\n";
                     outfile.close();
+                } catch(std::exception &e) {
+                    std::cerr << e.what() << std::endl;
                 }
             }
         }
