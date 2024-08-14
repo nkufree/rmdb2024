@@ -60,6 +60,7 @@ void SetTransaction(txn_id_t *txn_id, Context *context) {
     context->txn_ = txn_manager->get_transaction(*txn_id);
     if(context->txn_ == nullptr || context->txn_->get_state() == TransactionState::COMMITTED ||
         context->txn_->get_state() == TransactionState::ABORTED) {
+        txn_manager->release_txn(context->txn_);
         context->txn_ = txn_manager->begin(nullptr, context->log_mgr_);
         *txn_id = context->txn_->get_transaction_id();
         context->txn_->set_txn_mode(false);
@@ -165,6 +166,8 @@ void *client_handler(void *sock_fd) {
                     outfile.open("output.txt",std::ios::out | std::ios::app);
                     outfile << "failure\n";
                     outfile.close();
+                } catch(std::exception &e) {
+                    std::cerr << e.what() << std::endl;
                 }
             }
         }
@@ -184,10 +187,11 @@ void *client_handler(void *sock_fd) {
             break;
         }
         // 如果是单挑语句，需要按照一个完整的事务来执行，所以执行完当前语句后，自动提交事务
-        if(context->txn_->get_txn_mode() == false)
+        if(context->txn_->get_txn_mode() == false && context->txn_->get_state() != TransactionState::COMMITTED)
         {
             txn_manager->commit(context->txn_, context->log_mgr_);
         }
+        delete context;
     }
 
     // Clear
@@ -297,7 +301,16 @@ int main(int argc, char **argv) {
         sm_manager->open_db(db_name);
 
         // recovery database
+        // try
+        // {
+            /* code */
         recovery->analyze();
+        // }
+        // catch(const std::exception& e)
+        // {
+        //     std::cerr << e.what() << '\n';
+        // }
+        
         recovery->redo();
         recovery->undo();
         

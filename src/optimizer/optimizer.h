@@ -46,6 +46,9 @@ class Optimizer {
         if (auto x = std::dynamic_pointer_cast<ast::Help>(query->parse)) {
             // help;
             return std::make_shared<OtherPlan>(T_Help, std::string());
+        } else if (auto x = std::dynamic_pointer_cast<ast::SetOutputFile>(query->parse)) {
+            // set output_file off
+            return std::make_shared<OtherPlan>(T_SetOutputFile, std::string());
         } else if (auto x = std::dynamic_pointer_cast<ast::ShowTables>(query->parse)) {
             // show tables;
             return std::make_shared<OtherPlan>(T_ShowTable, std::string());
@@ -70,6 +73,12 @@ class Optimizer {
         } else if (auto x = std::dynamic_pointer_cast<ast::SetStmt>(query->parse)) {
             // Set Knob Plan
             return std::make_shared<SetKnobPlan>(x->set_knob_type_, x->bool_val_);
+        } else if (auto x = std::dynamic_pointer_cast<ast::CreateStaticCheckpoint>(query->parse)) {
+            // create static_checkpoint;
+            return std::make_shared<OtherPlan>(T_Checkpoint, std::string());
+        } else if (auto x = std::dynamic_pointer_cast<ast::LoadStmt>(query->parse)) {
+            // load
+            return std::make_shared<LoadPlan>(T_LoadFile, x->file_name, x->tab_name);
         } else {
             return planner_->do_planner(query, context);
         }

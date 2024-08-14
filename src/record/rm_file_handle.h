@@ -73,6 +73,8 @@ class RmFileHandle {
 
     std::unique_ptr<RmRecord> get_record(const Rid &rid, Context *context) const;
 
+    Rid get_free_record(Context* context);
+
     Rid insert_record(char *buf, Context *context);
 
     void insert_record(const Rid &rid, char *buf);
@@ -84,6 +86,8 @@ class RmFileHandle {
     RmPageHandle create_new_page_handle();
 
     RmPageHandle fetch_page_handle(int page_no) const;
+
+    int get_record_count(Context* context) const;
 
     bool clear_pages(){ return buffer_pool_manager_->delete_all_pages(fd_); }
 

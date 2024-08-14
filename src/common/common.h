@@ -70,7 +70,21 @@ struct Value {
             if (len < (int)str_val.size()) {
                 throw StringOverflowError();
             }
-            memset(raw->data, 0, len);
+            memcpy(raw->data, str_val.c_str(), str_val.size());
+            memset(raw->data + str_val.size(), 0, len - str_val.size());
+        }
+    }
+
+    void update_raw() {
+        if (type == TYPE_INT) {
+            *(int *)(raw->data) = int_val;
+        } else if (type == TYPE_FLOAT) {
+            *(float *)(raw->data) = float_val;
+        } else if (type == TYPE_STRING) {
+            if (str_len < (int)str_val.size()) {
+                throw StringOverflowError();
+            }
+            memset(raw->data, 0, str_len);
             memcpy(raw->data, str_val.c_str(), str_val.size());
         }
     }
@@ -81,6 +95,10 @@ struct Value {
             float_val = int_val;
         } else if (type == TYPE_FLOAT && new_type == TYPE_INT) {
             int_val = float_val;
+        } else if(type == TYPE_STRING && new_type == TYPE_INT) {
+            sscanf(str_val.c_str(), "%d", &int_val);
+        } else if(type == TYPE_STRING && new_type == TYPE_FLOAT) {
+            sscanf(str_val.c_str(), "%f", &float_val);
         } else {
             throw IncompatibleTypeError(coltype2str(type), coltype2str(new_type));
         }
@@ -201,6 +219,8 @@ struct Condition {
     std::shared_ptr<PortalStmt> rhs_portal;
     std::set<Value> rhs_set;
     CondRhsType rhs_type;
+    std::vector<ColMeta>::const_iterator lhs_match_col;
+    std::vector<ColMeta>::const_iterator rhs_match_col;
 
     bool check_condition(const Value& lhs, const Value& rhs) const {
 

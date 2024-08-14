@@ -59,6 +59,7 @@ void SmManager::create_db(const std::string& db_name) {
 
     // 创建日志文件
     disk_manager_->create_file(LOG_FILE_NAME);
+    disk_manager_->create_file(RESTART_FILE_NAME);
 
     // 回到根目录
     if (chdir("..") < 0) {
@@ -239,6 +240,166 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     flush_meta();
 }
 
+void SmManager::load_table(const std::string& file_name, const std::string& tab_name)
+{
+    std::ifstream csv_data(file_name, std::ios::in);
+    auto fh = fhs_[tab_name].get();
+    TabMeta &tab = db_.get_table(tab_name);
+    if (!csv_data.is_open())
+    {
+        throw InternalError("error opening file");
+    }
+    std::string line;
+    std::string word;
+    getline(csv_data, line);
+    std::istringstream sin;
+    RmRecord rec(fh->get_file_hdr().record_size);
+    char* key = new char[tab.get_col_total_len()];
+    auto& indexes = tab.indexes;
+    std::vector<IxIndexHandle*> ihs;
+    for(auto& index: indexes) {
+        ihs.push_back(ihs_.at(ix_manager_->get_index_name(tab_name, index.cols)).get());
+    }
+    // 读取每一行数据
+    while (getline(csv_data, line))
+    {
+        sin.clear();
+        sin.str(line);
+        int curr = 0;
+        while (getline(sin, word, ','))
+        {
+            // Value& curr_value = values[curr];
+            Value curr_value;
+            curr_value.set_str(word);
+            curr_value.value_cast(tab.cols[curr].type);
+            auto &col = tab.cols[curr];
+            curr_value.init_raw(col.len);
+            memcpy(rec.data + col.offset, curr_value.raw->data, col.len);
+            curr++;
+        }
+        Rid rid = fh->insert_record(rec.data, nullptr);
+        // 插入索引
+        for(size_t i = 0; i < indexes.size(); ++i) {
+            auto& index = indexes[i];
+            auto& ih = ihs[i];
+            int offset = 0;
+            for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+                memcpy(key + offset, rec.data + index.cols[j].offset, index.cols[j].len);
+                offset += index.cols[j].len;
+            }
+            bool success;
+            ih->insert_entry(key, rid, nullptr, &success);
+        }
+    }
+    csv_data.close();
+    delete key;
+}
+
+// std::queue<std::unique_ptr<RmRecord>> records;
+// std::mutex mutexLock{};             
+// std::condition_variable condition{};
+// bool file_not_end = true;
+
+// struct thread_arg_t {
+//     TabMeta* tab;
+//     std::string file_name;
+//     int record_size;
+// };
+
+// void* read_csv(void* arg) {
+//     thread_arg_t* thread_arg = (thread_arg_t*)arg;
+//     TabMeta* tab = thread_arg->tab;
+//     std::string& file_name = thread_arg->file_name;
+//     std::ifstream csv_data(file_name, std::ios::in);
+//     if (!csv_data.is_open())
+//     {
+//         throw InternalError("error opening file");
+//     }
+//     std::string line;
+//     std::string word;
+//     std::istringstream sin;
+//     getline(csv_data, line); // skip the first line
+//     while (getline(csv_data, line))
+//     {
+//         auto rec = std::make_unique<RmRecord>(thread_arg->record_size);
+//         sin.clear();
+//         sin.str(line);
+//         int curr = 0;
+//         while (getline(sin, word, ','))
+//         {
+//             // Value& curr_value = values[curr];
+//             Value curr_value;
+//             curr_value.set_str(word);
+//             curr_value.value_cast(tab->cols[curr].type);
+//             auto &col = tab->cols[curr];
+//             curr_value.init_raw(col.len);
+//             memcpy(rec->data + col.offset, curr_value.raw->data, col.len);
+//             curr++;
+//         }
+//         std::unique_lock<std::mutex> lockGuard(mutexLock);
+//         records.push(std::move(rec));
+//         lockGuard.unlock();
+//         condition.notify_all();
+//     }
+//     csv_data.close();
+//     std::unique_lock<std::mutex> lockGuard(mutexLock);
+//     file_not_end = false;
+//     lockGuard.unlock();
+//     condition.notify_all();
+//     return nullptr;
+// }
+
+// void SmManager::load_table(const std::string& file_name, const std::string& tab_name)
+// {
+//     file_not_end = true;
+//     bool record_not_end = true;
+//     auto fh = fhs_[tab_name].get();
+//     TabMeta &tab = db_.get_table(tab_name);
+//     char* key = new char[tab.get_col_total_len()];
+//     auto& indexes = tab.indexes;
+//     std::vector<IxIndexHandle*> ihs;
+//     for(auto& index: indexes) {
+//         ihs.push_back(ihs_.at(ix_manager_->get_index_name(tab_name, index.cols)).get());
+//     }
+//     pthread_t thread_id;
+//     thread_arg_t thread_arg = {&tab, file_name, fh->get_file_hdr().record_size};
+//     pthread_create(&thread_id, nullptr, &read_csv, &thread_arg);
+//     // 读取每一行数据
+//     while (record_not_end)
+//     {
+//         std::unique_lock<std::mutex> lockGuard(mutexLock);
+//         if(records.empty()) {
+//             condition.wait(lockGuard);        
+//         }
+//         auto rec = std::move(records.front());
+//         if(rec == nullptr)
+//             break;
+//         records.pop();
+//         if(!file_not_end && records.empty()) {
+//             record_not_end = false;
+//         }
+//         lockGuard.unlock();
+//         // 插入数据
+//         Rid rid = fh->insert_record(rec->data, nullptr);
+//         // 插入索引
+//         for(size_t i = 0; i < indexes.size(); ++i) {
+//             auto& index = indexes[i];
+//             auto& ih = ihs[i];
+//             int offset = 0;
+//             for(size_t j = 0; j < (size_t)index.col_num; ++j) {
+//                 memcpy(key + offset, rec->data + index.cols[j].offset, index.cols[j].len);
+//                 offset += index.cols[j].len;
+//             }
+//             bool success;
+//             ih->insert_entry(key, rid, nullptr, &success);
+//         }
+//         // delete rec;
+//     }
+//     pthread_join(thread_id, nullptr);
+//     std::cout << "record size: " << records.size() << std::endl;
+//     delete key;
+// }
+
 /**
  * @description: 创建索引
  * @param {string&} tab_name 表的名称
@@ -259,9 +420,10 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     ix_manager_->create_index(tab_name, cols);
     tab.indexes.push_back({tab_name, col_tot_len,(int)cols.size(), cols});
     ihs_.emplace(ix_manager_->get_index_name(tab_name, col_names), std::move(ix_manager_->open_index(tab_name, col_names)));
+    flush_meta();
     // 将原有的数据插入索引中
-    auto &fh = fhs_[tab_name];
-    auto scan = std::make_unique<RmScan>(fh.get());
+    auto fh = fhs_[tab_name].get();
+    auto scan = std::make_unique<RmScan>(fh);
     char* key = new char[tab.get_col_total_len()];
     auto ih = ihs_.at(ix_manager_->get_index_name(tab_name, cols)).get();
     while (!scan->is_end()) {
@@ -272,7 +434,8 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
             offset += cols[i].len;
         }
         bool success;
-        ih->insert_entry(key, scan->rid(), context->txn_, &success);
+        Transaction* txn = context == nullptr ? nullptr : context->txn_;
+        ih->insert_entry(key, scan->rid(), txn, &success);
         if(!success) {
             fh->delete_record(scan->rid(), context);
         }
@@ -309,6 +472,7 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<std::s
     assert(res);
     ix_manager_->destroy_index(tab_name, col_names);
     ihs_.erase(index_it);
+    flush_meta();
 }
 
 /**
@@ -332,6 +496,7 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<ColMet
     assert(res);
     ix_manager_->destroy_index(tab_name, cols);
     ihs_.erase(index_it);
+    flush_meta();
 }
 
 void SmManager::show_index(const std::string& tab_name, Context* context) {

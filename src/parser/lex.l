@@ -39,6 +39,7 @@ identifier {alpha}(_|{alpha}|{digit})*
 value_int {sign}?{digit}+
 value_float {sign}?{digit}+\.({digit}+)?
 value_string '[^']*'
+path_like [^ ]*\.csv
 single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 
 %x STATE_COMMENT
@@ -96,6 +97,9 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 "IN" {return IN; }
 "ENABLE_NESTLOOP" { return ENABLE_NESTLOOP; }
 "ENABLE_SORTMERGE" { return ENABLE_SORTMERGE; }
+"STATIC_CHECKPOINT" { return STATIC_CHECKPOINT; }
+"OUTPUT_FILE" { return OUTPUT_FILE; }
+"OFF" { return OFF; }
 "TRUE" { 
     yylval->sv_bool = true;
     return VALUE_BOOL; 
@@ -104,11 +108,16 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
     yylval->sv_bool = false;
     return VALUE_BOOL;
 }
+"LOAD" { return LOAD; }
     /* operators */
 ">=" { return GEQ; }
 "<=" { return LEQ; }
 "<>" { return NEQ; }
 "!=" { return NEQ; }
+{path_like} {
+    yylval->sv_str = std::string(yytext);
+    return PATH_LIKE;
+}
 {single_op} { return yytext[0]; }
     /* id */
 {identifier} {

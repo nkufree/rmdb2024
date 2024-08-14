@@ -226,7 +226,7 @@ class IxIndexHandle {
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction, bool* success);
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
 
-    IxNodeHandle *split(IxNodeHandle *node);
+    IxNodeHandle* split(IxNodeHandle *node);
 
     void insert_into_parent(IxNodeHandle *old_node, const char *key, IxNodeHandle *new_node, Transaction *transaction);
 

@@ -102,9 +102,13 @@ class UpdateExecutor : public AbstractExecutor {
                 delete[] key;
                 throw RecordNotFoundError(rid.page_no, rid.slot_no);
             }
-            if(!ConditionCheck::check_conditions(conds_, tab_.cols, rec))
-                continue;
+            // if(!ConditionCheck::check_conditions(conds_, rec))
+            //     continue;
             // 更新记录
+            UpdateLogRecord log_record(context_->txn_->get_transaction_id(), *rec, *rec_new, rid, tab_name_);
+            log_record.prev_lsn_ = context_->txn_->get_prev_lsn();
+            lsn_t curr_lsn = context_->log_mgr_->add_log_to_buffer(&log_record);
+            context_->txn_->set_prev_lsn(curr_lsn);
             fh_->update_record(rid, rec_new->data, context_);
             WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, *rec);
             context_->txn_->append_write_record(wr);

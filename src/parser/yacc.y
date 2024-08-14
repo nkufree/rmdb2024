@@ -21,13 +21,13 @@ using namespace ast;
 %define parse.error verbose
 
 // keywords
-%token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER GROUP BY HAVING
+%token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER GROUP BY HAVING STATIC_CHECKPOINT LOAD OUTPUT_FILE OFF
 WHERE UPDATE SET SELECT MAX MIN SUM COUNT AS INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ORDER_BY ENABLE_NESTLOOP ENABLE_SORTMERGE ON
 // non-keywords
 %token IN LEQ NEQ GEQ T_EOF
 
 // type-specific tokens
-%token <sv_str> IDENTIFIER VALUE_STRING
+%token <sv_str> IDENTIFIER VALUE_STRING PATH_LIKE
 %token <sv_int> VALUE_INT
 %token <sv_float> VALUE_FLOAT
 %token <sv_bool> VALUE_BOOL
@@ -42,7 +42,7 @@ WHERE UPDATE SET SELECT MAX MIN SUM COUNT AS INT CHAR FLOAT INDEX AND JOIN EXIT 
 %type <sv_val> value
 %type <sv_vals> valueList oneValue
 %type <sv_vals_list> valuesList
-%type <sv_str> tbName colName alias
+%type <sv_str> tbName colName alias fileName
 %type <sv_strs> tableList colNameList
 %type <sv_col> col colEach
 %type <sv_cols> colList selector
@@ -76,6 +76,11 @@ start:
     |   T_EOF
     {
         parse_tree = nullptr;
+        YYACCEPT;
+    }
+    |   SET OUTPUT_FILE OFF
+    {
+        parse_tree = std::make_shared<SetOutputFile>();
         YYACCEPT;
     }
     ;
@@ -115,6 +120,14 @@ dbStmt:
     |   SHOW INDEX FROM tbName
     {
         $$ = std::make_shared<ShowIndex>($4);
+    }
+    |   CREATE STATIC_CHECKPOINT
+    {
+        $$ = std::make_shared<CreateStaticCheckpoint>();
+    }
+    |   LOAD fileName INTO tbName
+    {
+        $$ = std::make_shared<LoadStmt>($2, $4);
     }
     ;
 
@@ -517,6 +530,8 @@ set_knob_type:
 tbName: IDENTIFIER;
 
 colName: IDENTIFIER;
+
+fileName: PATH_LIKE;
 
 alias: IDENTIFIER;
 %%

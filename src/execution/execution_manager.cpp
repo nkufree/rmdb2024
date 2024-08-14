@@ -85,6 +85,11 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
                 *(context->offset_) = strlen(help_info);
                 break;
             }
+            case T_SetOutputFile:
+            {
+                planner_->set_write_output_file(false);
+                break;
+            }
             case T_ShowTable:
             {
                 sm_manager_->show_tables(context);
@@ -124,11 +129,18 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
                 txn_mgr_->abort(context->txn_, context->log_mgr_);
                 break;
             }     
+            case T_Checkpoint:
+            {
+                txn_mgr_->create_static_checkpoint(context, sm_manager_);
+                break;
+            }
             default:
                 throw InternalError("Unexpected field type");
                 break;                        
         }
 
+    } else if (auto x = std::dynamic_pointer_cast<LoadPlan>(plan)) {
+        sm_manager_->load_table(x->file_name_, x->tab_name_);
     } else if(auto x = std::dynamic_pointer_cast<SetKnobPlan>(plan)) {
         switch (x->set_knob_type_)
         {
@@ -167,15 +179,21 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     rec_printer.print_separator(context);
     // print header into file
     std::fstream outfile;
-    outfile.open("output.txt", std::ios::out | std::ios::app);
+    bool enable_output_file = planner_->get_enable_output_file();
+    if(enable_output_file) {
+        outfile.open("output.txt", std::ios::out | std::ios::app);
+    }
     
     // Print records
     size_t num_rec = 0;
-    outfile << "|";
-    for(int i = 0; i < (int)captions.size(); ++i) {
-        outfile << " " << captions[i] << " |";
+    if(enable_output_file){
+        outfile << "|";
+        for(int i = 0; i < (int)captions.size(); ++i) {
+            outfile << " " << captions[i] << " |";
+        }
+        outfile << "\n";
     }
-    outfile << "\n";
+    
     // 执行query_plan
     for (executorTreeRoot->beginTuple(); !executorTreeRoot->is_end(); executorTreeRoot->nextTuple()) {
         auto Tuple = executorTreeRoot->Next();
@@ -199,14 +217,17 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
         // print record into buffer
         rec_printer.print_record(columns, context);
         // print record into file
-        outfile << "|";
-        for(int i = 0; i < (int)columns.size(); ++i) {
-            outfile << " " << columns[i] << " |";
+        if(enable_output_file){
+            outfile << "|";
+            for(int i = 0; i < (int)columns.size(); ++i) {
+                outfile << " " << columns[i] << " |";
+            }
+            outfile << "\n";
         }
-        outfile << "\n";
+        
         num_rec++;
     }
-    outfile.close();
+    if(enable_output_file) outfile.close();
     // Print footer into buffer
     rec_printer.print_separator(context);
     // Print record count into buffer

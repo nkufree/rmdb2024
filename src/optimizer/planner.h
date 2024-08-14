@@ -32,6 +32,7 @@ class Planner {
 
     bool enable_nestedloop_join = true;
     bool enable_sortmerge_join = false;
+    bool write_output_file = true;
 
    public:
     Planner(SmManager *sm_manager) : sm_manager_(sm_manager) {}
@@ -43,6 +44,9 @@ class Planner {
     
     void set_enable_sortmerge_join(bool set_val) { enable_sortmerge_join = set_val; }
     
+    void set_write_output_file(bool set_val) { write_output_file = set_val; }
+
+    bool get_enable_output_file() { return write_output_file; }
    private:
     std::shared_ptr<Query> logical_optimization(std::shared_ptr<Query> query, Context *context);
     std::shared_ptr<Plan> physical_optimization(std::shared_ptr<Query> query, Context *context);

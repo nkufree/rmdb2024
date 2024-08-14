@@ -67,9 +67,9 @@ void ConditionCheck::execute_sub_query(Condition& cond)
     }
 }
 
-bool ConditionCheck::check_conditions(std::vector<Condition>& conds, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
+bool ConditionCheck::check_conditions(std::vector<Condition>& conds, const std::unique_ptr<RmRecord>& rec)
 {
-    bool res = std::all_of(conds.begin(), conds.end(), [&](Condition& cond) { return check_single_condition(cond, cols, rec); });
+    bool res = std::all_of(conds.begin(), conds.end(), [&](Condition& cond) { return check_single_condition(cond, rec); });
     return res;
 }
 
@@ -94,14 +94,14 @@ static Value build_value(ColType col_type, int offset, const std::unique_ptr<RmR
     return val;
 }
 
-bool ConditionCheck::check_single_condition(Condition& cond, const std::vector<ColMeta>& cols, const std::unique_ptr<RmRecord>& rec)
+bool ConditionCheck::check_single_condition(Condition& cond, const std::unique_ptr<RmRecord>& rec)
 {
-    auto lhs_match_col = AbstractExecutor::get_col(cols, cond.lhs_col);
+    auto& lhs_match_col = cond.lhs_match_col;
     Value lhs_val = build_value(lhs_match_col->type, lhs_match_col->offset, rec, lhs_match_col->len);
     Value rhs_val = cond.rhs_val;
     if(cond.rhs_type == CondRhsType::RHS_COL)
     {
-        auto rhs_match_col = AbstractExecutor::get_col(cols, cond.rhs_col);
+        auto& rhs_match_col = cond.rhs_match_col;
         rhs_val = build_value(rhs_match_col->type, rhs_match_col->offset, rec, rhs_match_col->len);
     }
     // 2. 类型转换
