@@ -486,7 +486,7 @@ bool IxIndexHandle::coalesce_or_redistribute(IxNodeHandle *node, Transaction *tr
     // 4. 如果node结点和兄弟结点的键值对数量之和，能够支撑两个B+树结点（即node.size+neighbor.size >=
     // NodeMinSize*2)，则只需要重新分配键值对（调用Redistribute函数）
     // 5. 如果不满足上述条件，则需要合并两个结点，将右边的结点合并到左边的结点（调用Coalesce函数）
-    std::cout << "Coalesce or Redistribute: " << std::endl;
+    // std::cout << "Coalesce or Redistribute: " << std::endl;
     // node->print_info();
     if(node->is_root_page())
     {
@@ -518,19 +518,19 @@ bool IxIndexHandle::coalesce_or_redistribute(IxNodeHandle *node, Transaction *tr
     }
     
     
-    if(parent)
-    {
-        buffer_pool_manager_->unpin_page(parent->get_page_id(), true);
-        delete parent;
-        parent = nullptr;
-    }
-    if(neighbor_node)
-    {
-        buffer_pool_manager_->unpin_page(neighbor_node->get_page_id(), true);
-        delete neighbor_node;
-        neighbor_node = nullptr;
-    }
-    std::cout << "End Coalesce or Redistribute" << std::endl;
+    // if(parent)
+    // {
+    //     buffer_pool_manager_->unpin_page(parent->get_page_id(), true);
+    //     delete parent;
+    //     parent = nullptr;
+    // }
+    // if(neighbor_node)
+    // {
+    //     buffer_pool_manager_->unpin_page(neighbor_node->get_page_id(), true);
+    //     delete neighbor_node;
+    //     neighbor_node = nullptr;
+    // }
+    // std::cout << "End Coalesce or Redistribute" << std::endl;
     return res;
 }
 
@@ -639,7 +639,7 @@ bool IxIndexHandle::coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, 
     // 2. 把node结点的键值对移动到neighbor_node中，并更新node结点孩子结点的父节点信息（调用maintain_child函数）
     // 3. 释放和删除node结点，并删除parent中node结点的信息，返回parent是否需要被删除
     // 提示：如果是叶子结点且为最右叶子结点，需要更新file_hdr_.last_leaf
-    std::cout << "coalesce (neighbour, node, parent): " << std::endl;
+    // std::cout << "coalesce (neighbour, node, parent): " << std::endl;
     // (*neighbor_node)->print_info();
     // (*node)->print_info();
     // (*parent)->print_info();
@@ -674,7 +674,7 @@ bool IxIndexHandle::coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, 
     // std::cout << "coalesce result (neighbour, parent): " << std::endl;
     // (*neighbor_node)->print_info();
     // (*parent)->print_info();
-    std::cout << "End coalesce" << std::endl;
+    // std::cout << "End coalesce" << std::endl;
     return res;
 }
 
