@@ -242,6 +242,12 @@ public:
     Rid rid_;                   // 记录插入的位置
     char* table_name_;          // 插入记录的表名称
     size_t table_name_size_;    // 表名称的大小
+
+    ~InsertLogRecord() {
+        if(table_name_ != nullptr) {
+            delete[] table_name_;
+        }
+    }
 };
 
 /**
@@ -309,6 +315,12 @@ public:
     Rid rid_;                   // 记录插入的位置
     char* table_name_;          // 删除记录的表名称
     size_t table_name_size_;    // 表名称的大小
+
+    ~DeleteLogRecord() {
+        if(table_name_ != nullptr) {
+            delete[] table_name_;
+        }
+    }
 };
 
 /**
@@ -385,6 +397,12 @@ public:
     Rid rid_;                   // 记录插入的位置
     char* table_name_;          // 更新记录的表名称
     size_t table_name_size_;    // 表名称的大小
+
+    ~UpdateLogRecord() {
+        if(table_name_ != nullptr) {
+            delete[] table_name_;
+        }
+    }
 };
 
 /* 日志缓冲区，只有一个buffer，因此需要阻塞地去把日志写入缓冲区中 */

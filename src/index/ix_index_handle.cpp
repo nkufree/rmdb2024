@@ -486,7 +486,7 @@ bool IxIndexHandle::coalesce_or_redistribute(IxNodeHandle *node, Transaction *tr
     // 4. 如果node结点和兄弟结点的键值对数量之和，能够支撑两个B+树结点（即node.size+neighbor.size >=
     // NodeMinSize*2)，则只需要重新分配键值对（调用Redistribute函数）
     // 5. 如果不满足上述条件，则需要合并两个结点，将右边的结点合并到左边的结点（调用Coalesce函数）
-    std::cout << "Coalesce or Redistribute: " << std::endl;
+    // std::cout << "Coalesce or Redistribute: " << std::endl;
     // node->print_info();
     if(node->is_root_page())
     {
@@ -516,10 +516,20 @@ bool IxIndexHandle::coalesce_or_redistribute(IxNodeHandle *node, Transaction *tr
     {
         res = coalesce(&neighbor_node, &node, &parent, index, transaction, root_is_latched);
     }
-    buffer_pool_manager_->unpin_page(parent->get_page_id(), true);
-    buffer_pool_manager_->unpin_page(neighbor_node->get_page_id(), true);
-    delete parent;
-    delete neighbor_node;
+    
+    
+    if(parent)
+    {
+        buffer_pool_manager_->unpin_page(parent->get_page_id(), true);
+        delete parent;
+    }
+    if(neighbor_node)
+    {
+        buffer_pool_manager_->unpin_page(neighbor_node->get_page_id(), true);
+        delete neighbor_node;
+    }
+    parent = nullptr;
+    neighbor_node = nullptr;
     std::cout << "End Coalesce or Redistribute" << std::endl;
     return res;
 }

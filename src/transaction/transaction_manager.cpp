@@ -60,7 +60,11 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     log_record.prev_lsn_ = txn->get_prev_lsn();
     lsn_t curr_lsn = log_manager->add_log_to_buffer(&log_record);
     txn->set_prev_lsn(curr_lsn);
-    txn->get_write_set()->clear();
+    for(auto it = txn->get_write_set()->begin(); it != txn->get_write_set()->end();)
+    {
+        delete *it;
+        it = txn->get_write_set()->erase(it);
+    }
     for(auto it = txn->get_lock_set()->begin(); it != txn->get_lock_set()->end();)
     {
         if(it->type_ == LockDataType::RECORD)
@@ -187,6 +191,11 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     }
     log_manager->flush_log_to_disk();
     txn->set_state(TransactionState::ABORTED);
+    for(auto it = txn->get_write_set()->begin(); it != txn->get_write_set()->end();)
+    {
+        delete *it;
+        it = txn->get_write_set()->erase(it);
+    }
     cv_.notify_all();
 }
 
