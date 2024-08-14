@@ -98,4 +98,11 @@ class SeqScanExecutor : public AbstractExecutor {
     size_t tupleLen() const override { return len_; }
 
     const std::vector<ColMeta> &cols() const override { return cols_; }
+
+    int get_count() {
+        if(fed_conds_.size() != 0) {
+            return -1;
+        }
+        return fh_->get_record_count(context_);
+    }
 };

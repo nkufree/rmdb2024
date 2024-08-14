@@ -64,4 +64,8 @@ class ProjectionExecutor : public AbstractExecutor {
     size_t tupleLen() const override { return len_; }
 
     Rid &rid() override { return _abstract_rid; }
+
+    int get_count() {
+        return prev_->get_count();
+    }
 };

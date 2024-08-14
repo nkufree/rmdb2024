@@ -229,3 +229,17 @@ void RmFileHandle::release_page_handle(RmPageHandle&page_handle) {
         file_hdr_.first_free_page_no = file_hdr_.first_free_page_no;
     }
 }
+
+int RmFileHandle::get_record_count(Context* context) const
+{
+    if(context)
+        context->lock_mgr_->lock_shared_on_table(context->txn_, fd_);
+    int count = 0;
+    for(int i = RM_FIRST_RECORD_PAGE; i < file_hdr_.num_pages; i++)
+    {
+        RmPageHandle page_handle = fetch_page_handle(i);
+        count += page_handle.page_hdr->num_records;
+        buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), false);
+    }
+    return count;
+}

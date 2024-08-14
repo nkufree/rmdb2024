@@ -195,6 +195,10 @@ void RecoveryManager::undo() {
         
     }
     // 删除索引，重新建立索引
+    if(redo_txn_.size() == 0 && undo_txn_.size() == 0)
+    {
+        return;
+    }
     for(auto& table : sm_manager_->fhs_)
     {
         auto& tab = sm_manager_->db_.get_table(table.first);

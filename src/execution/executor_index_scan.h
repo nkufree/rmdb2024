@@ -295,4 +295,11 @@ private:
             offset += index_meta_.cols[i].len;
         }
     }
+
+    int get_count() override {
+        if(fed_conds_.size() != 0) {
+            return -1;
+        }
+        return fh_->get_record_count(context_);
+    }
 };

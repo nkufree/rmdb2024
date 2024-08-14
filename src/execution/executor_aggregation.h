@@ -29,6 +29,8 @@ class AggregationExecutor : public AbstractExecutor {
     int curr_idx = -1; // 当前组索引
     std::vector<std::unique_ptr<RmRecord>> curr_records; // 保存当前组的记
     bool empty_table_aggr_ = false; // 是否进行过空表聚合
+    bool only_count_star_ = false; // 是否只有 count(*) 聚合
+    int count_star_ = -1; // count(*) 的值
 
    public:
     AggregationExecutor(std::unique_ptr<AbstractExecutor> prev, const std::vector<TabCol> &sel_cols, 
@@ -84,6 +86,10 @@ class AggregationExecutor : public AbstractExecutor {
                 cond.lhs_match_col = get_col(sel_cols_origin, cond.lhs_col, true);   
             }
         }
+
+        if(sel_cols.size() == 1 && sel_cols[0].aggr == ast::AGGR_TYPE_COUNT && sel_cols[0].col_name == "*") {
+            only_count_star_ = true;
+        }
     }
 
     void store_group(std::unique_ptr<RmRecord> record) {
@@ -99,6 +105,15 @@ class AggregationExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
+        if(only_count_star_) {
+            count_star_ = prev_->get_count();
+        }
+        if(count_star_ == -1)
+            only_count_star_ = false;
+        else
+        {
+            return;
+        }
         for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
             auto record = prev_->Next();
             store_group(std::move(record));
@@ -286,6 +301,16 @@ class AggregationExecutor : public AbstractExecutor {
     }
 
     std::unique_ptr<RmRecord> Next() override {
+        if(only_count_star_) {
+            Value val;
+            val.type = TYPE_INT;
+            val.set_int(count_star_);
+            val.init_raw(sizeof(int));
+            auto data = std::make_unique<char[]>(sizeof(int));
+            memcpy(data.get(), val.raw->data, sizeof(int));
+            curr_idx++;
+            return std::make_unique<RmRecord>(sizeof(int), data.get());
+        }
         std::vector<Value> values;
 
         int idx = 0;

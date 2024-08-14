@@ -73,4 +73,6 @@ class AbstractExecutor {
         return pos;
     }
 
+
+    virtual int get_count() { return -1; }
 };
