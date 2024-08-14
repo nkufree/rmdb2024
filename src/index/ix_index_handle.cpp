@@ -798,11 +798,11 @@ IxNodeHandle *IxIndexHandle::create_node() {
  * @param node
  */
 void IxIndexHandle::maintain_parent(IxNodeHandle *node) {
-    std::shared_ptr<IxNodeHandle> curr(node);
+    IxNodeHandle* curr = node;
     while (curr->get_parent_page_no() != IX_NO_PAGE) {
         // Load its parent
-        std::unique_ptr<IxNodeHandle> parent(fetch_node(curr->get_parent_page_no()));
-        int rank = parent->find_child(curr.get());
+        IxNodeHandle* parent = fetch_node(curr->get_parent_page_no());
+        int rank = parent->find_child(curr);
         char *parent_key = parent->get_key(rank);
         char *child_first_key = curr->get_key(0);
         if (memcmp(parent_key, child_first_key, file_hdr_->col_tot_len_) == 0) {
@@ -810,9 +810,12 @@ void IxIndexHandle::maintain_parent(IxNodeHandle *node) {
             break;
         }
         memcpy(parent_key, child_first_key, file_hdr_->col_tot_len_);  // 修改了parent node
-        curr = std::move(parent);
-
-        buffer_pool_manager_->unpin_page(parent->get_page_id(), true);
+        if(curr != node)
+        {
+            buffer_pool_manager_->unpin_page(curr->get_page_id(), true);
+            delete curr;
+        }
+        curr = parent;
     }
 }
 
