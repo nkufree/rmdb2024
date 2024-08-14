@@ -292,6 +292,7 @@ void SmManager::load_table(const std::string& file_name, const std::string& tab_
         }
     }
     csv_data.close();
+    delete key;
 }
 
 // std::queue<std::unique_ptr<RmRecord>> records;

@@ -47,6 +47,15 @@ public:
 
     void create_static_checkpoint(Context* context, SmManager* sm_manager);
 
+    void release_txn(Transaction* txn) {
+        if(txn == nullptr) return;
+        std::unique_lock<std::shared_mutex> lock(latch_);
+        if(TransactionManager::txn_map.find(txn->get_transaction_id()) == TransactionManager::txn_map.end())
+            return;
+        TransactionManager::txn_map.erase(txn->get_transaction_id());
+        delete txn;
+    }
+
     /**
      * @description: 获取事务ID为txn_id的事务对象
      * @return {Transaction*} 事务对象的指针

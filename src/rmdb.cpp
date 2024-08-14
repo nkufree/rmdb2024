@@ -60,6 +60,7 @@ void SetTransaction(txn_id_t *txn_id, Context *context) {
     context->txn_ = txn_manager->get_transaction(*txn_id);
     if(context->txn_ == nullptr || context->txn_->get_state() == TransactionState::COMMITTED ||
         context->txn_->get_state() == TransactionState::ABORTED) {
+        txn_manager->release_txn(context->txn_);
         context->txn_ = txn_manager->begin(nullptr, context->log_mgr_);
         *txn_id = context->txn_->get_transaction_id();
         context->txn_->set_txn_mode(false);
@@ -190,6 +191,7 @@ void *client_handler(void *sock_fd) {
         {
             txn_manager->commit(context->txn_, context->log_mgr_);
         }
+        delete context;
     }
 
     // Clear
