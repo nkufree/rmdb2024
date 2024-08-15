@@ -197,7 +197,7 @@ class Portal
                 }
             }
             return std::make_unique<AggregationExecutor>(convert_plan_executor(x->subplan_, context), 
-                                                        x->sel_cols_, x->group_cols_, x->having_conds_);
+                                                        x->sel_cols_, x->group_cols_, x->having_conds_, context);
         }
 
         return nullptr;

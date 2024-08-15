@@ -37,4 +37,5 @@ public:
     int *offset_;
     bool ellipsis_;
     bool write_output_file_;
+    bool use_table_lock_ = false;
 };

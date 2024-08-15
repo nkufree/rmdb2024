@@ -36,8 +36,10 @@ class AggregationExecutor : public AbstractExecutor {
 
    public:
     AggregationExecutor(std::unique_ptr<AbstractExecutor> prev, const std::vector<TabCol> &sel_cols, 
-        const std::vector<TabCol> &group_cols, const std::vector<Condition> &having_conds) {
+        const std::vector<TabCol> &group_cols, const std::vector<Condition> &having_conds, Context* context) {
         prev_ = std::move(prev);
+        context_ = context;
+        context_->use_table_lock_ = true;
 
         auto &prev_cols = prev_->cols();  
 
