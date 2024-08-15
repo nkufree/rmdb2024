@@ -21,6 +21,7 @@ class ProjectionExecutor : public AbstractExecutor {
     std::vector<ColMeta> cols_;                     // 需要投影的字段
     size_t len_;                                    // 字段总长度
     std::vector<size_t> sel_idxs_;                  
+    bool is_sel_all_ = true;                                // 是否选择全部字段
 
    public:
     ProjectionExecutor(std::unique_ptr<AbstractExecutor> prev, const std::vector<TabCol> &sel_cols) {
@@ -37,6 +38,21 @@ class ProjectionExecutor : public AbstractExecutor {
             cols_.push_back(col);
         }
         len_ = curr_offset;
+        if(sel_cols.size() != prev_cols.size())
+        {
+            is_sel_all_ = false;
+        }
+        else
+        {
+            for(size_t i = 0; i < sel_cols.size(); i++)
+            {
+                if(sel_cols[i].col_name != prev_cols[i].name && sel_cols[i].tab_name != prev_cols[i].tab_name && sel_cols[i].aggr != prev_cols[i].aggr)
+                {
+                    is_sel_all_ = false;
+                    break;
+                }
+            }
+        }
     }
 
     void beginTuple() override { prev_->beginTuple(); }
@@ -46,6 +62,10 @@ class ProjectionExecutor : public AbstractExecutor {
     std::unique_ptr<RmRecord> Next() override {
         // TODO(zzx): 可以优化，如果投影的是表中的全部字段则直接返回
         auto rec = prev_->Next();
+        if(is_sel_all_)
+        {
+            return rec;
+        }
         auto &prev_cols = prev_->cols();
         std::unique_ptr<RmRecord> new_rec = std::make_unique<RmRecord>(len_);
         int curr_offset = 0;
