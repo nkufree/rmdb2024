@@ -42,6 +42,7 @@ class SeqScanExecutor : public AbstractExecutor {
         len_ = cols_.back().offset + cols_.back().len;
 
         context_ = context;
+        context_->use_table_lock_ = true;
         fed_conds_ = conds_;
         for(auto &cond : fed_conds_) {
             ConditionCheck::execute_sub_query(cond);
