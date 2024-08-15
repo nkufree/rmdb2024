@@ -44,9 +44,9 @@ class ProjectionExecutor : public AbstractExecutor {
         }
         else
         {
-            for(size_t i = 0; i < sel_cols.size(); i++)
+            for(size_t i = 0; i < sel_idxs_.size(); i++)
             {
-                if(sel_cols[i].col_name != prev_cols[i].name && sel_cols[i].tab_name != prev_cols[i].tab_name && sel_cols[i].aggr != prev_cols[i].aggr)
+                if(sel_idxs_[i] != i)
                 {
                     is_sel_all_ = false;
                     break;
