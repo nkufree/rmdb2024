@@ -126,7 +126,8 @@ class UpdateExecutor : public AbstractExecutor {
                 bool success;
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
-                    continue;
+                    delete[] key;
+                    throw IndexDuplicateKeyError();
                 }
                 offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
@@ -148,8 +149,7 @@ class UpdateExecutor : public AbstractExecutor {
                 //     ih->delete_entry(key, context_->txn_);
                 //     // TODO: 回滚之前更新的数据
                 // }
-                delete[] key;
-                throw IndexDuplicateKeyError();
+                
             }
         }
         delete[] key;
