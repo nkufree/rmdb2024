@@ -208,14 +208,15 @@ void IxNodeHandle::erase_pair(int pos) {
  * @param key 要删除的键值对key值
  * @return 完成删除操作后的键值对数量
  */
-int IxNodeHandle::remove(const char *key) {
+int IxNodeHandle::remove(const char *key, Rid* rid) {
     // Todo:
     // 1. 查找要删除键值对的位置
     // 2. 如果要删除的键值对存在，删除键值对
     // 3. 返回完成删除操作后的键值对数量
     int pos = lower_bound(key);
     // 2,3
-    if(pos < page_hdr->num_key && ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0)
+    if(pos < page_hdr->num_key && ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0 &&
+    (rid == nullptr || *get_rid(pos) == *rid))
     {
         erase_pair(pos);
     }
@@ -434,7 +435,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
  * @param key 要删除的key值
  * @param transaction 事务指针
  */
-bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
+bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction, Rid* rid) {
     // Todo:
     // 1. 获取该键值对所在的叶子结点
     // 2. 在该叶子结点中删除键值对
@@ -443,7 +444,7 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
     std::scoped_lock<std::mutex> lock(root_latch_);
     std::pair<IxNodeHandle*, bool> leaf = find_leaf_page(key, Operation::DELETE, transaction);
     std::unique_ptr<IxNodeHandle> node(leaf.first);
-    node->remove(key);
+    node->remove(key, rid);
     if(memcmp(node->get_key(0), key, file_hdr_->col_tot_len_) == 0)
         maintain_parent(node.get());
     bool root_is_latched = false;

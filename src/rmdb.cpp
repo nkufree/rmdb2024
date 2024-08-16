@@ -140,6 +140,8 @@ void *client_handler(void *sock_fd) {
                 } catch (TransactionAbortException &e) {
                     // 事务需要回滚，需要把abort信息返回给客户端并写入output.txt文件中
                     std::string str = "abort\n";
+                    if(e.GetAbortReason() == AbortReason::UPGRADE_CONFLICT)
+                        str = "failure\n";
                     memcpy(data_send, str.c_str(), str.length());
                     data_send[str.length()] = '\0';
                     offset = str.length();

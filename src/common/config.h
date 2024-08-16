@@ -33,7 +33,7 @@ static constexpr int INVALID_LSN = -1;                                        //
 static constexpr int HEADER_PAGE_ID = 0;                                      // the header page id
 static constexpr int PAGE_SIZE = 4096;                                        // size of a data page in byte  4KB
 // static constexpr int BUFFER_POOL_SIZE = 65536;                                // size of buffer pool 256MB
-static constexpr int BUFFER_POOL_SIZE = 262144 * 2;                                // size of buffer pool 2GB
+static constexpr int BUFFER_POOL_SIZE = 262144 * 1;                                // size of buffer pool xGB
 static constexpr int LOG_BUFFER_SIZE = (1024 * PAGE_SIZE);                    // size of a log buffer in byte
 static constexpr int BUCKET_SIZE = 50;                                        // size of extendible hash bucket
 

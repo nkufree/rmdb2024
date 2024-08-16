@@ -62,33 +62,33 @@ class UpdateExecutor : public AbstractExecutor {
             ConditionCheck::execute_sub_query(cond);
         }
         // 先检查是否存在，存在则抛出异常
-        for(auto &rid : rids_) {
-            auto rec = fh_->get_record(rid, context_);
-            for (size_t i = 0; i < set_clauses_.size(); i++) {
-                auto &col = tab_.cols[set_idxs_[i]];
-                auto &val = set_clauses_[i].rhs;
-                memcpy(rec->data + col.offset, val.raw->data, col.len);
-            }
-            for(auto& index: update_indexes_) {
-                auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                char* key = new char[index.col_tot_len];
-                int offset = 0;
-                for(size_t i = 0; i < (size_t)index.col_num; ++i) {
-                    memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
-                    offset += index.cols[i].len;
-                }
-                Iid lower = ih->lower_bound(key);
-                Iid upper = ih->upper_bound(key);
-                if(lower != upper) {
-                    Rid curr = ih->get_rid(lower);
-                    if(!(curr == rid)) {
-                        delete[] key;
-                        throw IndexDuplicateKeyError();
-                    }
-                }
-                delete[] key;
-            }
-        }
+        // for(auto &rid : rids_) {
+        //     auto rec = fh_->get_record(rid, context_);
+        //     for (size_t i = 0; i < set_clauses_.size(); i++) {
+        //         auto &col = tab_.cols[set_idxs_[i]];
+        //         auto &val = set_clauses_[i].rhs;
+        //         memcpy(rec->data + col.offset, val.raw->data, col.len);
+        //     }
+        //     for(auto& index: update_indexes_) {
+        //         auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+        //         char* key = new char[index.col_tot_len];
+        //         int offset = 0;
+        //         for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+        //             memcpy(key + offset, rec->data + index.cols[i].offset, index.cols[i].len);
+        //             offset += index.cols[i].len;
+        //         }
+        //         Iid lower = ih->lower_bound(key);
+        //         Iid upper = ih->upper_bound(key);
+        //         if(lower != upper) {
+        //             Rid curr = ih->get_rid(lower);
+        //             if(!(curr == rid)) {
+        //                 delete[] key;
+        //                 throw IndexDuplicateKeyError();
+        //             }
+        //         }
+        //         delete[] key;
+        //     }
+        // }
         char* key = new char[tab_.get_col_total_len()];
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
@@ -115,8 +115,8 @@ class UpdateExecutor : public AbstractExecutor {
             // 更新索引
             // 先尝试插入数据，如果插入成功再尝试删除原来的数据
             // int failed_idx = -1;
-            for(size_t i = 0; i < update_indexes_.size(); i++) {
-                auto& index = update_indexes_[i];
+            for(auto& index : update_indexes_) {
+                // auto& index = update_indexes_[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 int offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
@@ -127,7 +127,8 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
                     delete[] key;
-                    throw IndexDuplicateKeyError();
+                    throw TransactionAbortException(context_->txn_->get_transaction_id(), AbortReason::UPGRADE_CONFLICT);
+                    // continue;
                 }
                 offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
@@ -137,19 +138,19 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->delete_entry(key, context_->txn_);
             }
             // if(failed_idx != -1) {
-                // 如果失败，删除之前插入的数据
-                // for(int i = failed_idx - 1; i >= 0; i--) {
-                //     auto& index = update_indexes_[i];
-                //     auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                //     int offset = 0;
-                //     for(size_t i = 0; i < (size_t)index.col_num; ++i) {
-                //         memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
-                //         offset += index.cols[i].len;
-                //     }
-                //     ih->delete_entry(key, context_->txn_);
-                //     // TODO: 回滚之前更新的数据
-                // }
-                
+            //     // 如果失败，删除之前插入的数据
+            //     for(int i = failed_idx - 1; i >= 0; i--) {
+            //         auto& index = update_indexes_[i];
+            //         auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+            //         int offset = 0;
+            //         for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+            //             memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
+            //             offset += index.cols[i].len;
+            //         }
+            //         ih->delete_entry(key, context_->txn_);
+            //         // TODO: 回滚之前更新的数据
+            //         throw IndexDuplicateKeyError();
+            //     }
             // }
         }
         delete[] key;
