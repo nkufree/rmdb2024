@@ -30,7 +30,9 @@ class AggregationExecutor : public AbstractExecutor {
     std::vector<std::unique_ptr<RmRecord>> curr_records; // 保存当前组的记
     bool empty_table_aggr_ = false; // 是否进行过空表聚合
     bool only_count_star_ = false; // 是否只有 count(*) 聚合
+    bool only_aggr_without_group_ = false; // 是否只有聚合没有分组
     int count_star_ = -1; // count(*) 的值
+    std::vector<Value> values_; // 保存聚合后的值
 
    public:
     AggregationExecutor(std::unique_ptr<AbstractExecutor> prev, const std::vector<TabCol> &sel_cols, 
@@ -43,7 +45,7 @@ class AggregationExecutor : public AbstractExecutor {
             auto pos = get_col(prev_cols, sel_group_col, false);
             group_cols_.push_back(*pos);
         }
-
+        bool has_no_aggr = true;
         for (auto &sel_col : sel_cols) {
             if (sel_col.aggr == ast::AGGR_TYPE_COUNT && sel_col.col_name == "*") {
                 ColMeta col = star_col(sel_col);
@@ -67,8 +69,14 @@ class AggregationExecutor : public AbstractExecutor {
                     }
                 }
             }
+            else {
+                has_no_aggr = false;
+            }
 
             sel_cols_.push_back(col);
+        }
+        if(has_no_aggr && group_cols.empty()) {
+            only_aggr_without_group_ = true;
         }
 
         size_t offset = 0;
@@ -104,6 +112,86 @@ class AggregationExecutor : public AbstractExecutor {
         grouped_records_[grouped_records_idx_[key]].push_back(std::move(record));
     }
 
+    void init_values() {
+        values_.clear();
+        for(auto &col : sel_cols_) {
+            Value val;
+            switch (col.type)
+            {
+            case ColType::TYPE_INT:
+                if(col.aggr == ast::AGGR_TYPE_MIN)
+                    val.set_int(std::numeric_limits<int>::max());
+                else if(col.aggr == ast::AGGR_TYPE_MAX)
+                    val.set_int(std::numeric_limits<int>::min());
+                else
+                    val.set_int(0);
+                break;
+            case ColType::TYPE_FLOAT:
+                if(col.aggr == ast::AGGR_TYPE_MIN)
+                    val.set_float(std::numeric_limits<float>::max());
+                else if(col.aggr == ast::AGGR_TYPE_MAX)
+                    val.set_float(std::numeric_limits<float>::min());
+                else
+                    val.set_float(0.0);
+                break;
+            case ColType::TYPE_STRING:
+                val.set_str("");
+                break;
+            default:
+                break;
+            }
+            values_.push_back(val);
+        }
+    }
+
+    void update_values(RmRecord* record)
+    {
+        for(size_t i = 0; i < sel_cols_.size(); i++)
+        {
+            auto& col = sel_cols_[i];
+            auto& col_origin = sel_cols_origin[i];
+            auto& val = values_[i];
+            switch(col.aggr)
+            {
+            case ast::AGGR_TYPE_COUNT:
+                val.int_val += 1;
+                break;
+            case ast::AGGR_TYPE_SUM:
+                if(col_origin.type == ColType::TYPE_INT)
+                {
+                    val.int_val += *(int*)(record->data + col_origin.offset);
+                }
+                else if(col_origin.type == ColType::TYPE_FLOAT)
+                {
+                    val.float_val += *(float*)(record->data + col_origin.offset);
+                }
+                break;
+            case ast::AGGR_TYPE_MAX:
+                if(col_origin.type == ColType::TYPE_INT)
+                {
+                    val.int_val = std::max(val.int_val, *(int*)(record->data + col_origin.offset));
+                }
+                else if(col_origin.type == ColType::TYPE_FLOAT)
+                {
+                    val.float_val = std::max(val.float_val, *(float*)(record->data + col_origin.offset));
+                }
+                break;
+            case ast::AGGR_TYPE_MIN:
+                if(col_origin.type == ColType::TYPE_INT)
+                {
+                    val.int_val = std::min(val.int_val, *(int*)(record->data + col_origin.offset));
+                }
+                else if(col_origin.type == ColType::TYPE_FLOAT)
+                {
+                    val.float_val = std::min(val.float_val, *(float*)(record->data + col_origin.offset));
+                }
+                break;
+            default:
+                throw InternalError("Unknown AggrType");
+            }
+        }
+    }
+
     void beginTuple() override {
         if(only_count_star_) {
             count_star_ = prev_->get_count();
@@ -114,9 +202,24 @@ class AggregationExecutor : public AbstractExecutor {
         {
             return;
         }
-        for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
-            auto record = prev_->Next();
-            store_group(std::move(record));
+        if(group_cols_.empty()) {
+            init_values();
+            for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
+                auto record = prev_->Next();
+                update_values(record.get());
+            }
+            for(size_t i = 0; i < sel_cols_.size(); i++)
+            {
+                auto& col = sel_cols_[i];
+                auto& val = values_[i];
+                val.init_raw(col.len);
+            }
+        }
+        else {
+            for (prev_->beginTuple(); !prev_->is_end(); prev_->nextTuple()) {
+                auto record = prev_->Next();
+                store_group(std::move(record));
+            }
         }
         nextTuple();
     }
@@ -311,23 +414,24 @@ class AggregationExecutor : public AbstractExecutor {
             curr_idx++;
             return std::make_unique<RmRecord>(sizeof(int), data.get());
         }
-        std::vector<Value> values;
-
-        int idx = 0;
-        for (auto sel_col : sel_cols_origin) {
-            Value val = aggregate_value(sel_col);
-            if (val.type == TYPE_NULL) {
-                sel_cols_[idx].type = TYPE_NULL;
+        if(!only_aggr_without_group_) {
+            values_.clear();
+            int idx = 0;
+            for (auto sel_col : sel_cols_origin) {
+                Value val = aggregate_value(sel_col);
+                if (val.type == TYPE_NULL) {
+                    sel_cols_[idx].type = TYPE_NULL;
+                }
+                values_.push_back(val);
+                ++idx;
             }
-            values.push_back(val);
-            ++idx;
         }
 
         auto data = std::make_unique<char[]>(len_);
         size_t offset = 0;
         size_t i = 0;
         for (auto col : sel_cols_) {
-            memcpy(data.get() + offset, values[i].raw->data, values[i].raw->size);
+            memcpy(data.get() + offset, values_[i].raw->data, values_[i].raw->size);
             ++i;
             offset += col.len;
         }
