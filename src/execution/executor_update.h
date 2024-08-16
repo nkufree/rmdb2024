@@ -126,8 +126,8 @@ class UpdateExecutor : public AbstractExecutor {
                 bool success;
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
-                    // delete[] key;
-                    throw IndexDuplicateKeyError();
+                    delete[] key;
+                    // throw IndexDuplicateKeyError();
                 }
                 offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
