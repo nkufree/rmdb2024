@@ -114,7 +114,7 @@ class UpdateExecutor : public AbstractExecutor {
             context_->txn_->append_write_record(wr);
             // 更新索引
             // 先尝试插入数据，如果插入成功再尝试删除原来的数据
-            int failed_idx = -1;
+            // int failed_idx = -1;
             for(auto& index : update_indexes_) {
                 // auto& index = update_indexes_[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
@@ -127,7 +127,7 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
                     delete[] key;
-                    throw IndexDuplicateKeyError();
+                    throw TransactionAbortException(context_->txn_->get_transaction_id(), AbortReason::UPGRADE_CONFLICT);
                     // continue;
                 }
                 offset = 0;
@@ -137,21 +137,21 @@ class UpdateExecutor : public AbstractExecutor {
                 }
                 ih->delete_entry(key, context_->txn_);
             }
-            if(failed_idx != -1) {
-                // 如果失败，删除之前插入的数据
-                for(int i = failed_idx - 1; i >= 0; i--) {
-                    auto& index = update_indexes_[i];
-                    auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-                    int offset = 0;
-                    for(size_t i = 0; i < (size_t)index.col_num; ++i) {
-                        memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
-                        offset += index.cols[i].len;
-                    }
-                    ih->delete_entry(key, context_->txn_);
-                    // TODO: 回滚之前更新的数据
-                    throw IndexDuplicateKeyError();
-                }
-            }
+            // if(failed_idx != -1) {
+            //     // 如果失败，删除之前插入的数据
+            //     for(int i = failed_idx - 1; i >= 0; i--) {
+            //         auto& index = update_indexes_[i];
+            //         auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+            //         int offset = 0;
+            //         for(size_t i = 0; i < (size_t)index.col_num; ++i) {
+            //             memcpy(key + offset, rec_new->data + index.cols[i].offset, index.cols[i].len);
+            //             offset += index.cols[i].len;
+            //         }
+            //         ih->delete_entry(key, context_->txn_);
+            //         // TODO: 回滚之前更新的数据
+            //         throw IndexDuplicateKeyError();
+            //     }
+            // }
         }
         delete[] key;
         return nullptr;
