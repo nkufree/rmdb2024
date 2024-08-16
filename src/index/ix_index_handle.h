@@ -160,7 +160,7 @@ class IxNodeHandle {
 
     void erase_pair(int pos);
 
-    int remove(const char *key);
+    int remove(const char *key, Rid* rid = nullptr);
 
     /**
      * @brief used in internal node to remove the last key in root node, and return the last child
@@ -231,7 +231,7 @@ class IxIndexHandle {
     void insert_into_parent(IxNodeHandle *old_node, const char *key, IxNodeHandle *new_node, Transaction *transaction);
 
     // for delete
-    bool delete_entry(const char *key, Transaction *transaction);
+    bool delete_entry(const char *key, Transaction *transaction, Rid* rid = nullptr);
 
     bool coalesce_or_redistribute(IxNodeHandle *node, Transaction *transaction = nullptr,
                                 bool *root_is_latched = nullptr);
