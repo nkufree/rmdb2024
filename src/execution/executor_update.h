@@ -115,8 +115,8 @@ class UpdateExecutor : public AbstractExecutor {
             // 更新索引
             // 先尝试插入数据，如果插入成功再尝试删除原来的数据
             int failed_idx = -1;
-            for(size_t i = 0; i < update_indexes_.size(); i++) {
-                auto& index = update_indexes_[i];
+            for(auto& index : update_indexes_) {
+                // auto& index = update_indexes_[i];
                 auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
                 int offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
@@ -126,8 +126,9 @@ class UpdateExecutor : public AbstractExecutor {
                 bool success;
                 ih->insert_entry(key, rid, context_->txn_, &success);
                 if(!success) {
+                    delete[] key;
                     throw IndexDuplicateKeyError();
-                    continue;
+                    // continue;
                 }
                 offset = 0;
                 for(size_t i = 0; i < (size_t)index.col_num; ++i) {
