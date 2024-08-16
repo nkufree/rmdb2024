@@ -61,7 +61,7 @@ class UpdateExecutor : public AbstractExecutor {
         for(auto &cond : conds_) {
             ConditionCheck::execute_sub_query(cond);
         }
-        先检查是否存在，存在则抛出异常
+        // 先检查是否存在，存在则抛出异常
         for(auto &rid : rids_) {
             auto rec = fh_->get_record(rid, context_);
             for (size_t i = 0; i < set_clauses_.size(); i++) {
