@@ -269,10 +269,16 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
     std::shared_ptr<LockRequestQueue> lock_request_queue;
     {
         std::scoped_lock<std::mutex> lock(latch_);
-        if(lock_table_.find(lock_data_id) == lock_table_.end()) {
+        auto it = lock_table_.find(lock_data_id);
+        if(it == lock_table_.end()) {
             return false;
         }
         lock_request_queue = lock_table_[lock_data_id];
+        if(lock_request_queue.empty())
+        {
+            lock_table_.erase(it);
+            return;
+        }
     }
     std::unique_lock<std::mutex> queue_lock(lock_request_queue->latch_);
     auto& request_queue = lock_request_queue->request_queue_;
@@ -285,9 +291,9 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
     auto first_granted = std::find_if(request_queue.begin(), request_queue.end(), [&](const std::shared_ptr<LockRequest>& lock_request){
         return lock_request->granted_;
     });
-    if(request_queue.empty()) {
-        lock_request_queue->group_lock_mode_ = GroupLockMode::NON_LOCK;
-    }
+    // if(request_queue.empty()) {
+        // lock_request_queue->group_lock_mode_ = GroupLockMode::NON_LOCK;
+    // }
     else if(first_granted == request_queue.end())
     {
         // 更新加锁队列的锁模式
